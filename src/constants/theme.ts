@@ -1,7 +1,6 @@
 export const START_DATE = '2025-10-12';
 export const COLUMNS = 7;
 export const FUTURE_WEEKS = 3;
-export const MILESTONES = [100, 200, 300, 365, 500, 730, 1000, 1095, 1461, 1500, 2000, 3000, 5000] as const;
 
 export const Palette = {
   light: {

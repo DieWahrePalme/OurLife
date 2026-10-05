@@ -1,5 +1,3 @@
-import { MILESTONES } from '@/constants/theme';
-
 const MS_PER_DAY = 86_400_000;
 
 /** Parses "YYYY-MM-DD" as a calendar day (no timezone drift). */
@@ -35,14 +33,10 @@ export function formatDay(stamp: number, withWeekday = false): string {
   }).format(new Date(stamp));
 }
 
-export function nextMilestone(dayNumber: number): number {
-  const known = MILESTONES.find((m) => m >= dayNumber);
-  return known ?? Math.ceil(dayNumber / 1000) * 1000;
+/** "Oct" or, with year, "Oct ’25". */
+export function formatMonthLabel(stamp: number, withYear: boolean): string {
+  const date = new Date(stamp);
+  const month = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short' }).format(date);
+  return withYear ? `${month} ’${String(date.getUTCFullYear()).slice(-2)}` : month;
 }
 
-/** Day number of the start-date anniversary for a given year (year 1 = day 1). */
-export function yearStartDay(startStamp: number, year: number): number {
-  const start = new Date(startStamp);
-  const anniversary = toDayStamp(start.getUTCFullYear() + year - 1, start.getUTCMonth(), start.getUTCDate());
-  return dayNumberFor(startStamp, anniversary);
-}

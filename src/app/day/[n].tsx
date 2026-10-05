@@ -33,7 +33,7 @@ export default function DayScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', paddingTop: 24, gap: 6 },
-  title: { fontFamily: 'Caveat_700Bold', fontSize: 56 },
+  title: { fontFamily: 'Caveat_700Bold', fontSize: 56, lineHeight: 80, paddingHorizontal: 12 },
   date: { fontSize: 15, marginBottom: 32 },
   empty: { fontSize: 18 },
   hint: { fontSize: 14 },

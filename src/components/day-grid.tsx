@@ -5,10 +5,10 @@ import { useRouter } from 'expo-router';
 import { DayDot, type DotState } from '@/components/day-dot';
 import { COLUMNS, FUTURE_WEEKS, type PaletteColors } from '@/constants/theme';
 import { strings } from '@/constants/strings';
-import { dateForDayNumber, formatDay, yearStartDay } from '@/lib/dates';
+import { dateForDayNumber, formatDay, formatMonthLabel } from '@/lib/dates';
 
 const MAX_GRID_WIDTH = 480;
-const GUTTER = 64;
+const GUTTER = 72;
 const SIDE_PADDING = 12;
 
 interface DayGridProps {
@@ -22,18 +22,18 @@ interface WeekRowProps {
   startStamp: number;
   todayNumber: number;
   cell: number;
-  yearLabel: string | null;
+  monthLabel: string | null;
   colors: PaletteColors;
   onPressDay: (dayNumber: number) => void;
 }
 
-const WeekRow = memo(function WeekRow({ week, startStamp, todayNumber, cell, yearLabel, colors, onPressDay }: WeekRowProps) {
+const WeekRow = memo(function WeekRow({ week, startStamp, todayNumber, cell, monthLabel, colors, onPressDay }: WeekRowProps) {
   const firstDay = week * COLUMNS + 1;
   const days = Array.from({ length: COLUMNS }, (_, i) => firstDay + i);
   return (
     <View style={styles.row}>
       <View style={styles.gutter}>
-        {yearLabel ? <Text style={[styles.yearLabel, { color: colors.inkSoft }]}>{yearLabel}</Text> : null}
+        {monthLabel ? <Text style={[styles.monthLabel, { color: colors.inkSoft }]}>{monthLabel}</Text> : null}
       </View>
       {days.map((n) => {
         const state: DotState = n < todayNumber ? 'past' : n === todayNumber ? 'today' : 'future';
@@ -63,10 +63,19 @@ export function DayGrid({ startStamp, todayNumber, colors }: DayGridProps) {
   const weekCount = todayWeek + 1 + FUTURE_WEEKS;
   const weeks = useMemo(() => Array.from({ length: weekCount }, (_, i) => i), [weekCount]);
 
-  const yearLabels = useMemo(() => {
+  const monthLabels = useMemo(() => {
     const labels = new Map<number, string>();
-    for (let year = 1; yearStartDay(startStamp, year) <= weekCount * COLUMNS; year += 1) {
-      labels.set(Math.floor((yearStartDay(startStamp, year) - 1) / COLUMNS), strings.yearLabel(year));
+    for (let week = 0; week < weekCount; week += 1) {
+      const firstDay = week * COLUMNS + 1;
+      for (let n = firstDay; n < firstDay + COLUMNS; n += 1) {
+        const stamp = dateForDayNumber(startStamp, n);
+        const date = new Date(stamp);
+        if (date.getUTCDate() === 1 || week === 0) {
+          const showYear = week === 0 || date.getUTCMonth() === 0;
+          labels.set(week, formatMonthLabel(stamp, showYear));
+          break;
+        }
+      }
     }
     return labels;
   }, [startStamp, weekCount]);
@@ -88,7 +97,7 @@ export function DayGrid({ startStamp, todayNumber, colors }: DayGridProps) {
           startStamp={startStamp}
           todayNumber={todayNumber}
           cell={cell}
-          yearLabel={yearLabels.get(item) ?? null}
+          monthLabel={monthLabels.get(item) ?? null}
           colors={colors}
           onPressDay={onPressDay}
         />
@@ -101,5 +110,5 @@ const styles = StyleSheet.create({
   content: { alignSelf: 'center', paddingHorizontal: SIDE_PADDING, paddingBottom: 48 },
   row: { flexDirection: 'row', alignItems: 'center' },
   gutter: { width: GUTTER - SIDE_PADDING, paddingRight: 8 },
-  yearLabel: { fontSize: 12, fontWeight: '600' },
+  monthLabel: { fontSize: 12, fontWeight: '600' },
 });
