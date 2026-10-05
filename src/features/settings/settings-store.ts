@@ -21,7 +21,7 @@ interface SettingsState extends StoredSettings {
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isValidStartDate(value: string): boolean {
-  return DATE_PATTERN.test(value) && !Number.isNaN(Date.parse(value));
+  return DATE_PATTERN.test(value) && !Number.isNaN(Date.parse(value)) && Date.parse(value) <= Date.now();
 }
 
 function readSettings(raw: string | null): StoredSettings {

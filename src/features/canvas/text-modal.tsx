@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { PaletteColors } from '@/constants/theme';
@@ -20,13 +20,6 @@ interface TextModalProps {
 export function TextModal({ visible, initialText, placeholder, colors, goalNames, onSave, onCancel }: TextModalProps) {
   const [text, setText] = useState(initialText);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (visible) {
-      setText(initialText);
-      setError(null);
-    }
-  }, [visible, initialText]);
 
   const canSave = text.trim().length > 0;
 

@@ -14,7 +14,7 @@ interface StickerSheetProps {
 export function StickerSheet({ visible, colors, onPick, onClose }: StickerSheetProps) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable accessibilityLabel={strings.close} style={styles.backdrop} onPress={onClose} />
+      <Pressable accessibilityRole="button" accessibilityLabel={strings.close} style={styles.backdrop} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: colors.paper }]}>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
           {strings.stickerSheetTitle}

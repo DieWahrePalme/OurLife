@@ -23,20 +23,18 @@ export function dateForDayNumber(startStamp: number, dayNumber: number): number 
   return startStamp + (dayNumber - 1) * MS_PER_DAY;
 }
 
+const DAY_FORMAT = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
+const DAY_FORMAT_WEEKDAY = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+const MONTH_FORMAT = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short' });
+
 export function formatDay(stamp: number, withWeekday = false): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    weekday: withWeekday ? 'long' : undefined,
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(stamp));
+  return (withWeekday ? DAY_FORMAT_WEEKDAY : DAY_FORMAT).format(new Date(stamp));
 }
 
 /** "Oct" or, with year, "Oct ’25". */
 export function formatMonthLabel(stamp: number, withYear: boolean): string {
   const date = new Date(stamp);
-  const month = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'short' }).format(date);
+  const month = MONTH_FORMAT.format(date);
   return withYear ? `${month} ’${String(date.getUTCFullYear()).slice(-2)}` : month;
 }
 

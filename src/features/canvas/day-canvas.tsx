@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -25,6 +25,8 @@ const TAPE_COLORS = [PEN_COLORS[1], PEN_COLORS[2], PEN_COLORS[4], PEN_COLORS[5]]
 const SPAWN_SPREAD = 60;
 const SPAWN_ROWS = 6;
 const SPAWN_ROW_HEIGHT = 90;
+/** A tap on an item also reaches the page underneath (on web); ignore that page tap. */
+const SELECT_GRACE_MS = 300;
 const RECOLOR_KINDS: readonly CanvasItem['kind'][] = ['text', 'tape', 'todo', 'focus', 'goal'];
 
 type EditableKind = 'text' | 'todo' | 'focus';
@@ -43,8 +45,9 @@ function newId(): string {
 }
 
 export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
-  const { items, error, add, update, remove, bringToFront } = useDayItems(dayNumber);
+  const { items, canEdit, error, add, update, remove, bringToFront } = useDayItems(dayNumber);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const lastSelectAt = useRef(0);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const penColor = useSettingsStore((state) => state.penColor);
   const goals = useGoalsStore((state) => state.goals);
@@ -117,15 +120,28 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const editedGoal = editedItem?.kind === 'goal' ? goals.find((g) => g.id === editedItem.content) : undefined;
   const editingText = editedGoal && editedItem ? commandText(editedGoal, editedItem.amount ?? 0) : editedItem?.kind === 'todo' ? (editedItem.tasks ?? []).map((t) => t.text).join('\n') : (editedItem?.content ?? '');
 
-  const onSelect = useCallback((id: string) => setSelectedId(id), []);
+  const removeItem = useCallback(
+    (id: string) => {
+      remove(id);
+      setSelectedId((current) => (current === id ? null : current));
+    },
+    [remove],
+  );
+
+  const onSelect = useCallback((id: string) => {
+    lastSelectAt.current = Date.now();
+    setSelectedId(id);
+  }, []);
   const onEdit = useCallback((id: string) => setEditor({ mode: 'edit', id }), []);
 
   return (
     <GestureHandlerRootView style={styles.root}>
       <View style={styles.pageWrap}>
         <Pressable
-          accessibilityLabel="Page"
-          onPress={() => setSelectedId(null)}
+          accessible={false}
+          onPress={() => {
+            if (Date.now() - lastSelectAt.current > SELECT_GRACE_MS) setSelectedId(null);
+          }}
           onLayout={(e) => setPageSize(e.nativeEvent.layout)}
           style={[styles.page, { backgroundColor: colors.page, borderColor: colors.line }]}
         >
@@ -137,6 +153,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
               onSelect={onSelect}
               onEdit={onEdit}
               onChange={update}
+              onRemove={removeItem}
             />
           ))}
         </Pressable>
@@ -146,6 +163,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
           </Text>
         ) : null}
       </View>
+      {canEdit ? (
       <Toolbar
         colors={colors}
         selectedColor={selected?.color ?? null}
@@ -165,7 +183,9 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
           setSelectedId(null);
         }}
       />
+      ) : null}
       <TextModal
+        key={editor ? (editor.mode === 'edit' ? editor.id : `new-${editor.kind}`) : 'closed'}
         visible={editor !== null}
         initialText={editingText}
         placeholder={editorKind === 'todo' ? strings.todoPlaceholder : editorKind === 'focus' ? strings.focusPlaceholder : strings.textPlaceholder}

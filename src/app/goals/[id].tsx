@@ -1,5 +1,5 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Palette } from '@/constants/theme';
@@ -22,12 +22,18 @@ export default function GoalDetailScreen() {
 
   const refresh = useCallback(async () => {
     await load();
-    setEntries(await loadGoalEntries());
+    try {
+      setEntries(await loadGoalEntries());
+    } catch {
+      setEntries([]);
+    }
   }, [load]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
 
   const goal = goals.find((g) => g.id === id);
   if (!goal) return <Text style={[styles.empty, { color: colors.inkSoft }]}>{strings.goalNotFound}</Text>;

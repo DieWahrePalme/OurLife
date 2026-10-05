@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   card: { width: CARD_WIDTH, backgroundColor: '#FFFFFF', borderWidth: 2, borderRadius: 12, padding: 12, gap: 4 },
   cardTitle: { fontFamily: 'Caveat_700Bold', fontSize: 28, lineHeight: 38 },
   focusText: { fontFamily: 'Caveat_700Bold', fontSize: 24, lineHeight: 34, color: INK },
-  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 36 },
+  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   check: { color: '#fff', fontSize: 14, fontWeight: '700' },
   taskText: { flex: 1, fontFamily: 'Caveat_700Bold', fontSize: 22, lineHeight: 30, color: INK },

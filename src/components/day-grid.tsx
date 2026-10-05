@@ -8,8 +8,8 @@ import { strings } from '@/constants/strings';
 import { dateForDayNumber, formatDay, formatMonthLabel } from '@/lib/dates';
 
 const MAX_GRID_WIDTH = 480;
-const GUTTER = 72;
-const SIDE_PADDING = 12;
+const GUTTER = 64;
+const SIDE_PADDING = 8;
 
 interface DayGridProps {
   startStamp: number;

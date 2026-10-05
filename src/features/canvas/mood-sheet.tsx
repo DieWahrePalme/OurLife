@@ -14,7 +14,7 @@ interface MoodSheetProps {
 export function MoodSheet({ visible, colors, onPick, onClose }: MoodSheetProps) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable accessibilityLabel={strings.close} style={styles.backdrop} onPress={onClose} />
+      <Pressable accessibilityRole="button" accessibilityLabel={strings.close} style={styles.backdrop} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: colors.paper }]}>
         <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
           {strings.moodSheetTitle}

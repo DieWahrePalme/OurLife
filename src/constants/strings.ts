@@ -16,7 +16,7 @@ export const strings = {
   settingsStartHint: 'Day 1 of your grid. Both phones should use the same date.',
   settingsStartSave: 'Save date',
   settingsStartSaved: 'Saved.',
-  settingsStartInvalid: 'Write the date like 2025-10-12.',
+  settingsStartInvalid: 'Write a date in the past like 2025-10-12.',
   goalsEmpty: 'No goals yet. Create one below, then write /goal name +50 on any day.',
   newGoalTitle: 'New goal',
   goalNamePlaceholder: 'Name, e.g. Car',

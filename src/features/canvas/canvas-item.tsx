@@ -5,7 +5,9 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { strings } from '@/constants/strings';
+import { useGoalsStore } from '@/features/goals/goals-store';
 import { ItemContent } from './item-content';
+import { moodFor } from './moods';
 import { MAX_SCALE, MIN_SCALE, type CanvasItem, type ItemKind } from './types';
 
 interface CanvasItemViewProps {
@@ -14,19 +16,29 @@ interface CanvasItemViewProps {
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onChange: (id: string, patch: Partial<CanvasItem>) => void;
+  onRemove: (id: string) => void;
 }
 
+const ITEM_ACTIONS = [
+  { name: 'activate', label: 'Select' },
+  { name: 'edit', label: 'Edit' },
+  { name: 'delete', label: 'Delete' },
+];
 const EDITABLE_KINDS: readonly ItemKind[] = ['text', 'todo', 'focus', 'goal'];
 const DEG_PER_RAD = 180 / Math.PI;
 
-function labelFor(item: CanvasItem): string {
+function labelFor(item: CanvasItem, goalName: string | undefined): string {
   if (item.kind === 'tape') return 'Washi tape';
   if (item.kind === 'photo') return strings.photoLabel;
   if (item.kind === 'todo') return strings.todoTitle;
+  if (item.kind === 'mood') return moodFor(item.content).label;
+  if (item.kind === 'goal') return `${goalName ?? 'Goal'} ${item.amount ?? ''}`.trim();
+  if (item.kind === 'sticker') return `Sticker ${item.content}`;
   return item.content;
 }
 
-function CanvasItemViewBase({ item, selected, onSelect, onEdit, onChange }: CanvasItemViewProps) {
+function CanvasItemViewBase({ item, selected, onSelect, onEdit, onChange, onRemove }: CanvasItemViewProps) {
+  const goalName = useGoalsStore((state) => state.goals.find((g) => g.id === item.content)?.name);
   const x = useSharedValue(item.x);
   const y = useSharedValue(item.y);
   const scale = useSharedValue(item.scale);
@@ -92,9 +104,17 @@ function CanvasItemViewBase({ item, selected, onSelect, onEdit, onChange }: Canv
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
-        accessible
-        accessibilityLabel={labelFor(item)}
+        accessible={item.kind !== 'todo'}
+        accessibilityRole="button"
+        accessibilityLabel={labelFor(item, goalName)}
+        accessibilityState={{ selected }}
         accessibilityHint="Drag to move, pinch to resize, twist to rotate"
+        accessibilityActions={ITEM_ACTIONS}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'delete') onRemove(item.id);
+          else if (e.nativeEvent.actionName === 'edit') onEdit(item.id);
+          else onSelect(item.id);
+        }}
         style={[styles.item, animatedStyle, selected && styles.selected]}
       >
         <ItemContent item={item} onChange={onChange} />
