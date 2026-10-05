@@ -12,6 +12,7 @@ interface ToolbarProps {
   onAddText: () => void;
   onAddSticker: () => void;
   onAddTape: () => void;
+  onAddPhoto: () => void;
   onPickColor: (color: string) => void;
   onToFront: () => void;
   onDelete: () => void;
@@ -59,6 +60,7 @@ export function Toolbar(props: ToolbarProps) {
         <View style={styles.row}>
           <ToolButton label={strings.addText} onPress={props.onAddText} colors={colors} />
           <ToolButton label={strings.addSticker} onPress={props.onAddSticker} colors={colors} />
+          <ToolButton label={strings.addPhoto} onPress={props.onAddPhoto} colors={colors} />
           <ToolButton label={strings.addTape} onPress={props.onAddTape} colors={colors} />
         </View>
       )}

@@ -1,9 +1,11 @@
+import { Image } from 'expo-image';
 import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { strings } from '@/constants/strings';
 import { MAX_SCALE, MIN_SCALE, type CanvasItem } from './types';
 
 interface CanvasItemViewProps {
@@ -17,10 +19,18 @@ interface CanvasItemViewProps {
 const TAPE_WIDTH = 120;
 const TAPE_HEIGHT = 34;
 const STICKER_SIZE = 56;
+const PHOTO_WIDTH = 200;
 const DEG_PER_RAD = 180 / Math.PI;
 
 function Content({ item }: { item: CanvasItem }) {
   if (item.kind === 'sticker') return <Text style={styles.sticker}>{item.content}</Text>;
+  if (item.kind === 'photo') {
+    return (
+      <View style={styles.polaroid}>
+        <Image source={{ uri: item.content }} style={{ width: PHOTO_WIDTH, aspectRatio: item.aspect ?? 1 }} contentFit="cover" accessibilityLabel={strings.photoLabel} />
+      </View>
+    );
+  }
   if (item.kind === 'tape') return <View style={[styles.tape, { backgroundColor: item.color }]} />;
   return <Text style={[styles.text, { color: item.color }]}>{item.content}</Text>;
 }
@@ -92,7 +102,7 @@ function CanvasItemViewBase({ item, selected, onSelect, onEdit, onChange }: Canv
     <GestureDetector gesture={gesture}>
       <Animated.View
         accessible
-        accessibilityLabel={item.kind === 'tape' ? 'Washi tape' : item.content}
+        accessibilityLabel={item.kind === 'tape' ? 'Washi tape' : item.kind === 'photo' ? strings.photoLabel : item.content}
         accessibilityHint="Drag to move, pinch to resize, twist to rotate"
         style={[styles.item, animatedStyle, selected && styles.selected]}
       >
@@ -109,5 +119,6 @@ const styles = StyleSheet.create({
   selected: { borderColor: '#8A8794', borderStyle: 'dashed' },
   sticker: { fontSize: STICKER_SIZE },
   text: { fontFamily: 'Caveat_700Bold', fontSize: 30, lineHeight: 42, maxWidth: 260 },
+  polaroid: { backgroundColor: '#fff', padding: 8, paddingBottom: 22, borderRadius: 3, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   tape: { width: TAPE_WIDTH, height: TAPE_HEIGHT, opacity: 0.8, borderRadius: 2 },
 });

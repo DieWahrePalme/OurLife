@@ -3,12 +3,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CanvasItemView } from './canvas-item';
+import { pickPhoto } from './photos';
 import { StickerSheet } from './sticker-sheet';
 import { TextModal } from './text-modal';
 import { Toolbar } from './toolbar';
 import { useDayItems } from './use-day-items';
 import { DEFAULT_PEN_COLOR, PEN_COLORS, type CanvasItem } from './types';
 import type { PaletteColors } from '@/constants/theme';
+import { strings } from '@/constants/strings';
 
 interface DayCanvasProps {
   dayNumber: number;
@@ -28,11 +30,12 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
   const [textTarget, setTextTarget] = useState<string | 'new' | null>(null);
   const [stickerOpen, setStickerOpen] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const selected = items.find((it) => it.id === selectedId) ?? null;
 
   const spawn = useCallback(
-    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color'>) => {
+    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect'>) => {
       const jitter = () => (Math.random() - 0.5) * SPAWN_SPREAD;
       const item: CanvasItem = {
         id: newId(),
@@ -47,6 +50,17 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     },
     [add, pageSize],
   );
+
+  const addPhoto = async () => {
+    setPhotoError(null);
+    try {
+      const id = newId();
+      const photo = await pickPhoto(id);
+      if (photo) spawn({ kind: 'photo', content: photo.uri, color: DEFAULT_PEN_COLOR, aspect: photo.aspect });
+    } catch {
+      setPhotoError(strings.photoFailed);
+    }
+  };
 
   const saveText = (text: string) => {
     if (textTarget === 'new') spawn({ kind: 'text', content: text, color: DEFAULT_PEN_COLOR });
@@ -79,18 +93,19 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
             />
           ))}
         </Pressable>
-        {error ? (
+        {error ?? photoError ? (
           <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.today }]}>
-            {error}
+            {error ?? photoError}
           </Text>
         ) : null}
       </View>
       <Toolbar
         colors={colors}
         selectedColor={selected?.color ?? null}
-        canRecolor={selected?.kind !== 'sticker'}
+        canRecolor={selected?.kind === 'text' || selected?.kind === 'tape'}
         onAddText={() => setTextTarget('new')}
         onAddSticker={() => setStickerOpen(true)}
+        onAddPhoto={addPhoto}
         onAddTape={() => spawn({ kind: 'tape', content: '', color: TAPE_COLORS[Math.floor(Math.random() * TAPE_COLORS.length)] })}
         onPickColor={(color) => selected && update(selected.id, { color })}
         onToFront={() => selected && bringToFront(selected.id)}

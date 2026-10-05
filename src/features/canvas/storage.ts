@@ -9,7 +9,8 @@ function isCanvasItem(value: unknown): value is CanvasItem {
   const v = value as Record<string, unknown>;
   return (
     typeof v.id === 'string' &&
-    (v.kind === 'text' || v.kind === 'sticker' || v.kind === 'tape') &&
+    (v.kind === 'text' || v.kind === 'sticker' || v.kind === 'tape' || v.kind === 'photo') &&
+    (v.aspect === undefined || typeof v.aspect === 'number') &&
     typeof v.x === 'number' &&
     typeof v.y === 'number' &&
     typeof v.scale === 'number' &&

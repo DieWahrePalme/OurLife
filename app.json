@@ -34,7 +34,12 @@
         }
       ],
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "expo-image",
+      [
+        "expo-image-picker",
+        { "photosPermission": "OurLife needs your photos so you can add them to your days." }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
