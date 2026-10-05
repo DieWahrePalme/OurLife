@@ -7,12 +7,13 @@ import { strings } from '@/constants/strings';
 interface TextModalProps {
   visible: boolean;
   initialText: string;
+  placeholder: string;
   colors: PaletteColors;
   onSave: (text: string) => void;
   onCancel: () => void;
 }
 
-export function TextModal({ visible, initialText, colors, onSave, onCancel }: TextModalProps) {
+export function TextModal({ visible, initialText, placeholder, colors, onSave, onCancel }: TextModalProps) {
   const [text, setText] = useState(initialText);
 
   useEffect(() => {
@@ -30,10 +31,10 @@ export function TextModal({ visible, initialText, colors, onSave, onCancel }: Te
             multiline
             value={text}
             onChangeText={setText}
-            placeholder={strings.textPlaceholder}
+            placeholder={placeholder}
             placeholderTextColor={colors.inkSoft}
             style={[styles.input, { color: colors.ink, borderColor: colors.line }]}
-            accessibilityLabel={strings.textPlaceholder}
+            accessibilityLabel={placeholder}
           />
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" onPress={onCancel} style={styles.button}>

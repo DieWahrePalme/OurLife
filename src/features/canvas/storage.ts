@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { CanvasItem } from './types';
+import { ITEM_KINDS, type CanvasItem, type ItemKind, type Task } from './types';
+
+function isTask(value: unknown): value is Task {
+  if (typeof value !== 'object' || value === null) return false;
+  const t = value as Record<string, unknown>;
+  return typeof t.text === 'string' && typeof t.done === 'boolean';
+}
 
 const keyFor = (dayNumber: number): string => `ourlife.day.${dayNumber}`;
 
@@ -9,7 +15,8 @@ function isCanvasItem(value: unknown): value is CanvasItem {
   const v = value as Record<string, unknown>;
   return (
     typeof v.id === 'string' &&
-    (v.kind === 'text' || v.kind === 'sticker' || v.kind === 'tape' || v.kind === 'photo') &&
+    ITEM_KINDS.includes(v.kind as ItemKind) &&
+    (v.tasks === undefined || (Array.isArray(v.tasks) && v.tasks.every(isTask))) &&
     (v.aspect === undefined || typeof v.aspect === 'number') &&
     typeof v.x === 'number' &&
     typeof v.y === 'number' &&

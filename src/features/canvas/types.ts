@@ -1,4 +1,9 @@
-export type ItemKind = 'text' | 'sticker' | 'tape' | 'photo';
+export type ItemKind = 'text' | 'sticker' | 'tape' | 'photo' | 'todo' | 'focus' | 'mood';
+
+export interface Task {
+  text: string;
+  done: boolean;
+}
 
 export interface CanvasItem {
   id: string;
@@ -14,7 +19,11 @@ export interface CanvasItem {
   content: string;
   /** Width divided by height, only for photos. */
   aspect?: number;
+  /** Checklist rows, only for to-do blocks. */
+  tasks?: Task[];
 }
+
+export const ITEM_KINDS: readonly ItemKind[] = ['text', 'sticker', 'tape', 'photo', 'todo', 'focus', 'mood'];
 
 export const PEN_COLORS = ['#3D6FD8', '#D9568A', '#8A5CD0', '#2E2B3A', '#2F9E6F', '#F07A2A'] as const;
 export const DEFAULT_PEN_COLOR = PEN_COLORS[0];

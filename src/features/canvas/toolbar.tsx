@@ -13,6 +13,9 @@ interface ToolbarProps {
   onAddSticker: () => void;
   onAddTape: () => void;
   onAddPhoto: () => void;
+  onAddTodo: () => void;
+  onAddFocus: () => void;
+  onAddMood: () => void;
   onPickColor: (color: string) => void;
   onToFront: () => void;
   onDelete: () => void;
@@ -61,6 +64,9 @@ export function Toolbar(props: ToolbarProps) {
           <ToolButton label={strings.addText} onPress={props.onAddText} colors={colors} />
           <ToolButton label={strings.addSticker} onPress={props.onAddSticker} colors={colors} />
           <ToolButton label={strings.addPhoto} onPress={props.onAddPhoto} colors={colors} />
+          <ToolButton label={strings.addTodo} onPress={props.onAddTodo} colors={colors} />
+          <ToolButton label={strings.addFocus} onPress={props.onAddFocus} colors={colors} />
+          <ToolButton label={strings.addMood} onPress={props.onAddMood} colors={colors} />
           <ToolButton label={strings.addTape} onPress={props.onAddTape} colors={colors} />
         </View>
       )}
@@ -71,7 +77,7 @@ export function Toolbar(props: ToolbarProps) {
 const styles = StyleSheet.create({
   bar: { paddingVertical: 10, paddingHorizontal: 12, borderTopWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 14, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontSize: 15, fontWeight: '600' },
   swatchHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 2 },

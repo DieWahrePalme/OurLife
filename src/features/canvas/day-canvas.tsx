@@ -4,11 +4,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CanvasItemView } from './canvas-item';
 import { pickPhoto } from './photos';
+import { MoodSheet } from './mood-sheet';
 import { StickerSheet } from './sticker-sheet';
 import { TextModal } from './text-modal';
 import { Toolbar } from './toolbar';
 import { useDayItems } from './use-day-items';
-import { DEFAULT_PEN_COLOR, PEN_COLORS, type CanvasItem } from './types';
+import { DEFAULT_PEN_COLOR, PEN_COLORS, type CanvasItem, type Task } from './types';
 import type { PaletteColors } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 
@@ -19,6 +20,20 @@ interface DayCanvasProps {
 
 const TAPE_COLORS = [PEN_COLORS[1], PEN_COLORS[2], PEN_COLORS[4], PEN_COLORS[5]] as const;
 const SPAWN_SPREAD = 60;
+const SPAWN_ROWS = 6;
+const SPAWN_ROW_HEIGHT = 90;
+const RECOLOR_KINDS: readonly CanvasItem['kind'][] = ['text', 'tape', 'todo', 'focus'];
+
+type EditableKind = 'text' | 'todo' | 'focus';
+type Editor = { mode: 'new'; kind: EditableKind } | { mode: 'edit'; id: string };
+
+function tasksFromText(text: string, previous: readonly Task[] = []): Task[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => ({ text: line, done: previous.some((t) => t.text === line && t.done) }));
+}
 
 function newId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -28,19 +43,20 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const { items, error, add, update, remove, bringToFront } = useDayItems(dayNumber);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
-  const [textTarget, setTextTarget] = useState<string | 'new' | null>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [moodOpen, setMoodOpen] = useState(false);
   const [stickerOpen, setStickerOpen] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   const selected = items.find((it) => it.id === selectedId) ?? null;
 
   const spawn = useCallback(
-    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect'>) => {
+    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect' | 'tasks'>) => {
       const jitter = () => (Math.random() - 0.5) * SPAWN_SPREAD;
       const item: CanvasItem = {
         id: newId(),
         x: Math.max(pageSize.width / 2 - 60 + jitter(), 8),
-        y: Math.max(pageSize.height / 3 + jitter(), 8),
+        y: Math.max(pageSize.height / 8 + (items.length % SPAWN_ROWS) * SPAWN_ROW_HEIGHT + jitter() / 3, 8),
         scale: 1,
         rotation: 0,
         ...partial,
@@ -48,7 +64,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
       add(item);
       setSelectedId(item.id);
     },
-    [add, pageSize],
+    [add, pageSize, items.length],
   );
 
   const addPhoto = async () => {
@@ -62,16 +78,24 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     }
   };
 
+  const editedItem = editor?.mode === 'edit' ? (items.find((it) => it.id === editor.id) ?? null) : null;
+  const editorKind: EditableKind | null = editor ? (editor.mode === 'new' ? editor.kind : (editedItem?.kind as EditableKind | undefined) ?? null) : null;
+
   const saveText = (text: string) => {
-    if (textTarget === 'new') spawn({ kind: 'text', content: text, color: DEFAULT_PEN_COLOR });
-    else if (textTarget) update(textTarget, { content: text });
-    setTextTarget(null);
+    if (editor?.mode === 'new') {
+      if (editor.kind === 'todo') spawn({ kind: 'todo', content: '', color: DEFAULT_PEN_COLOR, tasks: tasksFromText(text) });
+      else spawn({ kind: editor.kind, content: text, color: DEFAULT_PEN_COLOR });
+    } else if (editedItem) {
+      if (editedItem.kind === 'todo') update(editedItem.id, { tasks: tasksFromText(text, editedItem.tasks) });
+      else update(editedItem.id, { content: text });
+    }
+    setEditor(null);
   };
 
-  const editingText = textTarget && textTarget !== 'new' ? (items.find((it) => it.id === textTarget)?.content ?? '') : '';
+  const editingText = editedItem?.kind === 'todo' ? (editedItem.tasks ?? []).map((t) => t.text).join('\n') : (editedItem?.content ?? '');
 
   const onSelect = useCallback((id: string) => setSelectedId(id), []);
-  const onEdit = useCallback((id: string) => setTextTarget(id), []);
+  const onEdit = useCallback((id: string) => setEditor({ mode: 'edit', id }), []);
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -102,8 +126,11 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
       <Toolbar
         colors={colors}
         selectedColor={selected?.color ?? null}
-        canRecolor={selected?.kind === 'text' || selected?.kind === 'tape'}
-        onAddText={() => setTextTarget('new')}
+        canRecolor={selected !== null && RECOLOR_KINDS.includes(selected.kind)}
+        onAddText={() => setEditor({ mode: 'new', kind: 'text' })}
+        onAddTodo={() => setEditor({ mode: 'new', kind: 'todo' })}
+        onAddFocus={() => setEditor({ mode: 'new', kind: 'focus' })}
+        onAddMood={() => setMoodOpen(true)}
         onAddSticker={() => setStickerOpen(true)}
         onAddPhoto={addPhoto}
         onAddTape={() => spawn({ kind: 'tape', content: '', color: TAPE_COLORS[Math.floor(Math.random() * TAPE_COLORS.length)] })}
@@ -116,11 +143,21 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         }}
       />
       <TextModal
-        visible={textTarget !== null}
+        visible={editor !== null}
         initialText={editingText}
+        placeholder={editorKind === 'todo' ? strings.todoPlaceholder : editorKind === 'focus' ? strings.focusPlaceholder : strings.textPlaceholder}
         colors={colors}
         onSave={saveText}
-        onCancel={() => setTextTarget(null)}
+        onCancel={() => setEditor(null)}
+      />
+      <MoodSheet
+        visible={moodOpen}
+        colors={colors}
+        onClose={() => setMoodOpen(false)}
+        onPick={(key) => {
+          spawn({ kind: 'mood', content: key, color: DEFAULT_PEN_COLOR });
+          setMoodOpen(false);
+        }}
       />
       <StickerSheet
         visible={stickerOpen}
