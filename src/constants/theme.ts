@@ -1,4 +1,4 @@
-export const START_DATE = '2025-10-12';
+export const DEFAULT_START_DATE = '2025-10-12';
 export const COLUMNS = 7;
 export const FUTURE_WEEKS = 3;
 

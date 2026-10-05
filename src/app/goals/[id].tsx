@@ -2,9 +2,10 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
-import { START_DATE, Palette } from '@/constants/theme';
+import { Palette } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 import { formatAmount } from '@/features/goals/command';
+import { useSettingsStore } from '@/features/settings/settings-store';
 import { useGoalsStore } from '@/features/goals/goals-store';
 import { ProgressBar } from '@/features/goals/progress-bar';
 import { loadGoalEntries, progressFor, totalFor } from '@/features/goals/progress';
@@ -15,6 +16,7 @@ export default function GoalDetailScreen() {
   const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const startDate = useSettingsStore((state) => state.startDate);
   const { goals, load, removeGoal } = useGoalsStore();
   const [entries, setEntries] = useState<GoalEntry[]>([]);
 
@@ -32,7 +34,7 @@ export default function GoalDetailScreen() {
 
   const mine = entries.filter((e) => e.goalId === goal.id).sort((a, b) => b.dayNumber - a.dayNumber);
   const total = totalFor(goal, entries);
-  const startStamp = parseIsoDate(START_DATE);
+  const startStamp = parseIsoDate(startDate);
   const plain = (value: number) => formatAmount(value, goal.unit).replace(/^\+/, '');
 
   return (

@@ -9,10 +9,11 @@ import { StickerSheet } from './sticker-sheet';
 import { TextModal } from './text-modal';
 import { Toolbar } from './toolbar';
 import { useDayItems } from './use-day-items';
-import { DEFAULT_PEN_COLOR, PEN_COLORS, type CanvasItem, type Task } from './types';
+import { PEN_COLORS, type CanvasItem, type Task } from './types';
 import type { PaletteColors } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 import { commandText, isGoalCommand, parseGoalCommand } from '@/features/goals/command';
+import { useSettingsStore } from '@/features/settings/settings-store';
 import { useGoalsStore } from '@/features/goals/goals-store';
 
 interface DayCanvasProps {
@@ -45,6 +46,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const { items, error, add, update, remove, bringToFront } = useDayItems(dayNumber);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
+  const penColor = useSettingsStore((state) => state.penColor);
   const goals = useGoalsStore((state) => state.goals);
   const loadGoals = useGoalsStore((state) => state.load);
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -80,7 +82,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     try {
       const id = newId();
       const photo = await pickPhoto(id);
-      if (photo) spawn({ kind: 'photo', content: photo.uri, color: DEFAULT_PEN_COLOR, aspect: photo.aspect });
+      if (photo) spawn({ kind: 'photo', content: photo.uri, color: penColor, aspect: photo.aspect });
     } catch {
       setPhotoError(strings.photoFailed);
     }
@@ -95,14 +97,14 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
       const result = parseGoalCommand(text, goals);
       if (!result.ok) return result.error;
       const patch = { kind: 'goal' as const, content: result.goal.id, amount: result.amount };
-      if (editor.mode === 'new') spawn({ ...patch, color: DEFAULT_PEN_COLOR });
+      if (editor.mode === 'new') spawn({ ...patch, color: penColor });
       else if (editedItem) update(editedItem.id, patch);
       setEditor(null);
       return null;
     }
     if (editor?.mode === 'new') {
-      if (editor.kind === 'todo') spawn({ kind: 'todo', content: '', color: DEFAULT_PEN_COLOR, tasks: tasksFromText(text) });
-      else spawn({ kind: editor.kind, content: text, color: DEFAULT_PEN_COLOR });
+      if (editor.kind === 'todo') spawn({ kind: 'todo', content: '', color: penColor, tasks: tasksFromText(text) });
+      else spawn({ kind: editor.kind, content: text, color: penColor });
     } else if (editedItem) {
       if (editedItem.kind === 'todo') update(editedItem.id, { tasks: tasksFromText(text, editedItem.tasks) });
       else if (editedItem.kind === 'goal') return 'Write it like /goal car +50';
@@ -177,7 +179,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         colors={colors}
         onClose={() => setMoodOpen(false)}
         onPick={(key) => {
-          spawn({ kind: 'mood', content: key, color: DEFAULT_PEN_COLOR });
+          spawn({ kind: 'mood', content: key, color: penColor });
           setMoodOpen(false);
         }}
       />
@@ -186,7 +188,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         colors={colors}
         onClose={() => setStickerOpen(false)}
         onPick={(glyph) => {
-          spawn({ kind: 'sticker', content: glyph, color: DEFAULT_PEN_COLOR });
+          spawn({ kind: 'sticker', content: glyph, color: penColor });
           setStickerOpen(false);
         }}
       />
