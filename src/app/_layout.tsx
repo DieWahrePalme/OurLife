@@ -25,6 +25,8 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="day/[n]" options={{ title: '', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="goals/index" options={{ title: 'Goals', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="goals/[id]" options={{ title: '', headerBackTitle: 'Goals' }} />
       </Stack>
     </>
   );

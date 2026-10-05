@@ -1,5 +1,6 @@
+import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { DayGrid } from '@/components/day-grid';
 import { START_DATE, Palette } from '@/constants/theme';
@@ -14,6 +15,11 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.paper }]}>
       <View style={[styles.header, { borderBottomColor: colors.line }]}>
+        <Link href="/goals" asChild>
+          <Pressable accessibilityRole="link" accessibilityLabel={strings.goalsTitle} style={styles.goalsLink}>
+            <Text style={[styles.goalsText, { color: colors.dotPast }]}>{strings.goalsTitle}</Text>
+          </Pressable>
+        </Link>
         <Text accessibilityRole="header" style={[styles.number, { color: colors.ink }]}>
           {strings.dayTitle(todayNumber)}
         </Text>
@@ -28,5 +34,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { alignItems: 'center', paddingTop: 8, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 2 },
   number: { fontFamily: 'Caveat_700Bold', fontSize: 64, lineHeight: 92, paddingHorizontal: 12, paddingBottom: 6 },
+  goalsLink: { position: 'absolute', right: 8, top: 8, minHeight: 44, minWidth: 44, paddingHorizontal: 12, justifyContent: 'center' },
+  goalsText: { fontSize: 16, fontWeight: '600' },
   sub: { fontSize: 14 },
 });

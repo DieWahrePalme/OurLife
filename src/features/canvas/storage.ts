@@ -18,6 +18,7 @@ function isCanvasItem(value: unknown): value is CanvasItem {
     ITEM_KINDS.includes(v.kind as ItemKind) &&
     (v.tasks === undefined || (Array.isArray(v.tasks) && v.tasks.every(isTask))) &&
     (v.aspect === undefined || typeof v.aspect === 'number') &&
+    (v.amount === undefined || typeof v.amount === 'number') &&
     typeof v.x === 'number' &&
     typeof v.y === 'number' &&
     typeof v.scale === 'number' &&
@@ -36,4 +37,23 @@ export async function loadDay(dayNumber: number): Promise<CanvasItem[]> {
 
 export async function saveDay(dayNumber: number, items: readonly CanvasItem[]): Promise<void> {
   await AsyncStorage.setItem(keyFor(dayNumber), JSON.stringify(items));
+}
+
+const DAY_KEY_PREFIX = 'ourlife.day.';
+
+export interface StoredDay {
+  dayNumber: number;
+  items: CanvasItem[];
+}
+
+/** Every saved day page, used to total up goal entries. */
+export async function loadAllDays(): Promise<StoredDay[]> {
+  const keys = (await AsyncStorage.getAllKeys()).filter((k) => k.startsWith(DAY_KEY_PREFIX));
+  const days = await Promise.all(
+    keys.map(async (key) => {
+      const dayNumber = Number.parseInt(key.slice(DAY_KEY_PREFIX.length), 10);
+      return { dayNumber, items: await loadDay(dayNumber) };
+    }),
+  );
+  return days.filter((d) => Number.isInteger(d.dayNumber));
 }

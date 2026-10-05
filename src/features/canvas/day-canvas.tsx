@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -12,6 +12,8 @@ import { useDayItems } from './use-day-items';
 import { DEFAULT_PEN_COLOR, PEN_COLORS, type CanvasItem, type Task } from './types';
 import type { PaletteColors } from '@/constants/theme';
 import { strings } from '@/constants/strings';
+import { commandText, isGoalCommand, parseGoalCommand } from '@/features/goals/command';
+import { useGoalsStore } from '@/features/goals/goals-store';
 
 interface DayCanvasProps {
   dayNumber: number;
@@ -22,7 +24,7 @@ const TAPE_COLORS = [PEN_COLORS[1], PEN_COLORS[2], PEN_COLORS[4], PEN_COLORS[5]]
 const SPAWN_SPREAD = 60;
 const SPAWN_ROWS = 6;
 const SPAWN_ROW_HEIGHT = 90;
-const RECOLOR_KINDS: readonly CanvasItem['kind'][] = ['text', 'tape', 'todo', 'focus'];
+const RECOLOR_KINDS: readonly CanvasItem['kind'][] = ['text', 'tape', 'todo', 'focus', 'goal'];
 
 type EditableKind = 'text' | 'todo' | 'focus';
 type Editor = { mode: 'new'; kind: EditableKind } | { mode: 'edit'; id: string };
@@ -43,15 +45,21 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const { items, error, add, update, remove, bringToFront } = useDayItems(dayNumber);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
+  const goals = useGoalsStore((state) => state.goals);
+  const loadGoals = useGoalsStore((state) => state.load);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [moodOpen, setMoodOpen] = useState(false);
   const [stickerOpen, setStickerOpen] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
+  useEffect(() => {
+    loadGoals();
+  }, [loadGoals]);
+
   const selected = items.find((it) => it.id === selectedId) ?? null;
 
   const spawn = useCallback(
-    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect' | 'tasks'>) => {
+    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect' | 'tasks' | 'amount'>) => {
       const jitter = () => (Math.random() - 0.5) * SPAWN_SPREAD;
       const item: CanvasItem = {
         id: newId(),
@@ -81,18 +89,31 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const editedItem = editor?.mode === 'edit' ? (items.find((it) => it.id === editor.id) ?? null) : null;
   const editorKind: EditableKind | null = editor ? (editor.mode === 'new' ? editor.kind : (editedItem?.kind as EditableKind | undefined) ?? null) : null;
 
-  const saveText = (text: string) => {
+  /** Returns an error message to show in the editor, or null when saved. */
+  const saveText = (text: string): string | null => {
+    if (isGoalCommand(text) && editor && (editor.mode === 'new' ? editor.kind === 'text' : editedItem?.kind === 'text' || editedItem?.kind === 'goal')) {
+      const result = parseGoalCommand(text, goals);
+      if (!result.ok) return result.error;
+      const patch = { kind: 'goal' as const, content: result.goal.id, amount: result.amount };
+      if (editor.mode === 'new') spawn({ ...patch, color: DEFAULT_PEN_COLOR });
+      else if (editedItem) update(editedItem.id, patch);
+      setEditor(null);
+      return null;
+    }
     if (editor?.mode === 'new') {
       if (editor.kind === 'todo') spawn({ kind: 'todo', content: '', color: DEFAULT_PEN_COLOR, tasks: tasksFromText(text) });
       else spawn({ kind: editor.kind, content: text, color: DEFAULT_PEN_COLOR });
     } else if (editedItem) {
       if (editedItem.kind === 'todo') update(editedItem.id, { tasks: tasksFromText(text, editedItem.tasks) });
+      else if (editedItem.kind === 'goal') return 'Write it like /goal car +50';
       else update(editedItem.id, { content: text });
     }
     setEditor(null);
+    return null;
   };
 
-  const editingText = editedItem?.kind === 'todo' ? (editedItem.tasks ?? []).map((t) => t.text).join('\n') : (editedItem?.content ?? '');
+  const editedGoal = editedItem?.kind === 'goal' ? goals.find((g) => g.id === editedItem.content) : undefined;
+  const editingText = editedGoal && editedItem ? commandText(editedGoal, editedItem.amount ?? 0) : editedItem?.kind === 'todo' ? (editedItem.tasks ?? []).map((t) => t.text).join('\n') : (editedItem?.content ?? '');
 
   const onSelect = useCallback((id: string) => setSelectedId(id), []);
   const onEdit = useCallback((id: string) => setEditor({ mode: 'edit', id }), []);
@@ -147,6 +168,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         initialText={editingText}
         placeholder={editorKind === 'todo' ? strings.todoPlaceholder : editorKind === 'focus' ? strings.focusPlaceholder : strings.textPlaceholder}
         colors={colors}
+        goalNames={goals.map((g) => g.name)}
         onSave={saveText}
         onCancel={() => setEditor(null)}
       />

@@ -16,7 +16,7 @@ interface CanvasItemViewProps {
   onChange: (id: string, patch: Partial<CanvasItem>) => void;
 }
 
-const EDITABLE_KINDS: readonly ItemKind[] = ['text', 'todo', 'focus'];
+const EDITABLE_KINDS: readonly ItemKind[] = ['text', 'todo', 'focus', 'goal'];
 const DEG_PER_RAD = 180 / Math.PI;
 
 function labelFor(item: CanvasItem): string {

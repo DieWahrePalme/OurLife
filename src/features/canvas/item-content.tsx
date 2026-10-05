@@ -1,6 +1,8 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { formatAmount } from '@/features/goals/command';
+import { useGoalsStore } from '@/features/goals/goals-store';
 import { moodFor } from './moods';
 import type { CanvasItem } from './types';
 import { strings } from '@/constants/strings';
@@ -15,6 +17,19 @@ const INK = '#2E2B3A';
 interface ItemContentProps {
   item: CanvasItem;
   onChange: (id: string, patch: Partial<CanvasItem>) => void;
+}
+
+function GoalChip({ item }: { item: CanvasItem }) {
+  const goal = useGoalsStore((state) => state.goals.find((g) => g.id === item.content));
+  const amount = item.amount ?? 0;
+  return (
+    <View style={[styles.goalChip, { borderColor: item.color }]}>
+      <Text style={styles.goalName}>{goal ? goal.name : 'Deleted goal'}</Text>
+      <Text style={[styles.goalAmount, { color: amount < 0 ? '#C0463A' : '#2F9E6F' }]}>
+        {formatAmount(amount, goal?.unit ?? '')}
+      </Text>
+    </View>
+  );
 }
 
 export function ItemContent({ item, onChange }: ItemContentProps) {
@@ -34,6 +49,8 @@ export function ItemContent({ item, onChange }: ItemContentProps) {
           />
         </View>
       );
+    case 'goal':
+      return <GoalChip item={item} />;
     case 'mood': {
       const mood = moodFor(item.content);
       return (
@@ -88,6 +105,9 @@ const styles = StyleSheet.create({
   mood: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999 },
   moodFace: { fontSize: 26 },
   moodLabel: { fontFamily: 'Caveat_700Bold', fontSize: 26, lineHeight: 38, color: INK },
+  goalChip: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, paddingHorizontal: 14, borderRadius: 999, borderWidth: 2, backgroundColor: '#FFFFFF' },
+  goalName: { fontFamily: 'Caveat_700Bold', fontSize: 26, lineHeight: 36, color: INK },
+  goalAmount: { fontSize: 16, fontWeight: '700' },
   card: { width: CARD_WIDTH, backgroundColor: '#FFFFFF', borderWidth: 2, borderRadius: 12, padding: 12, gap: 4 },
   cardTitle: { fontFamily: 'Caveat_700Bold', fontSize: 28, lineHeight: 38 },
   focusText: { fontFamily: 'Caveat_700Bold', fontSize: 24, lineHeight: 34, color: INK },
