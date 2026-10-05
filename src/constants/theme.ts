@@ -5,6 +5,7 @@ export const FUTURE_WEEKS = 3;
 export const Palette = {
   light: {
     paper: '#FAF6F0',
+    page: '#FFFFFF',
     ink: '#2E2B3A',
     inkSoft: '#6F6A7A',
     dotPast: '#B9566F',
@@ -14,6 +15,7 @@ export const Palette = {
   },
   dark: {
     paper: '#1B1A1F',
+    page: '#24222A',
     ink: '#F3EEE8',
     inkSoft: '#A39DAD',
     dotPast: '#E48AA2',

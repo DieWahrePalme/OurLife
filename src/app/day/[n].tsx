@@ -3,7 +3,8 @@ import { StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { START_DATE, Palette } from '@/constants/theme';
 import { strings } from '@/constants/strings';
-import { dateForDayNumber, dayNumberFor, formatDay, parseIsoDate, todayStamp } from '@/lib/dates';
+import { DayCanvas } from '@/features/canvas/day-canvas';
+import { dateForDayNumber, formatDay, parseIsoDate } from '@/lib/dates';
 
 export default function DayScreen() {
   const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
@@ -15,26 +16,25 @@ export default function DayScreen() {
   }
 
   const startStamp = parseIsoDate(START_DATE);
-  const isFuture = dayNumber > dayNumberFor(startStamp, todayStamp());
 
   return (
     <View style={styles.screen}>
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
-        {strings.dayTitle(dayNumber)}
-      </Text>
-      <Text style={[styles.date, { color: colors.inkSoft }]}>
-        {formatDay(dateForDayNumber(startStamp, dayNumber), true)}
-      </Text>
-      <Text style={[styles.empty, { color: colors.ink }]}>{isFuture ? strings.futureDay : strings.emptyDay}</Text>
-      {!isFuture ? <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.emptyDayHint}</Text> : null}
+      <View style={styles.header}>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
+          {strings.dayTitle(dayNumber)}
+        </Text>
+        <Text style={[styles.date, { color: colors.inkSoft }]}>
+          {formatDay(dateForDayNumber(startStamp, dayNumber), true)}
+        </Text>
+      </View>
+      <DayCanvas key={dayNumber} dayNumber={dayNumber} colors={colors} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', paddingTop: 24, gap: 6 },
-  title: { fontFamily: 'Caveat_700Bold', fontSize: 56, lineHeight: 80, paddingHorizontal: 12 },
-  date: { fontSize: 15, marginBottom: 32 },
-  empty: { fontSize: 18 },
-  hint: { fontSize: 14 },
+  screen: { flex: 1 },
+  header: { alignItems: 'center', paddingBottom: 4 },
+  title: { fontFamily: 'Caveat_700Bold', fontSize: 44, lineHeight: 64, paddingHorizontal: 12 },
+  date: { fontSize: 14 },
 });
