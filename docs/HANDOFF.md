@@ -1,6 +1,8 @@
 # OurLife: handoff
 
-Last updated: 2026-10-06. Written by the builder session.
+Last updated: 2026-10-09. Written by the builder session.
+
+Repo: https://github.com/DieWahrePalme/OurLife (public, `main` pushed 2026-10-09, remote `origin` via SSH).
 
 ## What works today (all local, on the phone)
 
@@ -66,7 +68,7 @@ SQL itself is still untested because no database exists yet) and react-reviewer 
    phone, or a hosted web/EAS build.) Decides whether we need EAS soon.
 2. Sticker sources: free packs first, custom later?
 3. Create the Supabase project now? (Moritz decides, runs CLI with `!`.)
-4. Push the repo to GitHub? Not done, not asked yet.
+4. ~~Push the repo to GitHub?~~ Done (2026-10-09).
 
 ## Decisions already made
 

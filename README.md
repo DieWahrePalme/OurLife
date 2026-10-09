@@ -6,6 +6,8 @@ moods, goals). Built with Expo (React Native) + TypeScript. Supabase comes next.
 
 UI is English only. Personal content never goes in this repo.
 
+Repo: https://github.com/DieWahrePalme/OurLife (public)
+
 ## Status (2026-10-06)
 
 Everything below works **locally on the phone** (and in a browser). Nothing is synced yet.
