@@ -5,7 +5,11 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { Palette } from '@/constants/theme';
+import { useGoalsStore } from '@/features/goals/goals-store';
+import { PairScreen } from '@/features/space/pair-screen';
+import { useSpaceStore } from '@/features/space/space-store';
 import { useSettingsStore } from '@/features/settings/settings-store';
+import { subscribeToTable } from '@/features/sync/realtime';
 
 export default function RootLayout() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -15,11 +19,32 @@ export default function RootLayout() {
   const settingsLoaded = useSettingsStore((state) => state.loaded);
   const loadSettings = useSettingsStore((state) => state.load);
 
+  const spaceStatus = useSpaceStore((state) => state.status);
+  const initSpace = useSpaceStore((state) => state.init);
+  const loadGoals = useGoalsStore((state) => state.load);
+
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
 
-  if (!fontsLoaded || !settingsLoaded) return null;
+  // The shared space is read after the local settings, so the shared start date wins.
+  useEffect(() => {
+    if (settingsLoaded) initSpace();
+  }, [settingsLoaded, initSpace]);
+
+  // The other phone adds or removes a goal: refresh the list.
+  useEffect(() => (spaceStatus === 'ready' ? subscribeToTable('goals', loadGoals) : undefined), [spaceStatus, loadGoals]);
+
+  if (!fontsLoaded || !settingsLoaded || spaceStatus === 'loading') return null;
+
+  if (spaceStatus === 'pairing' || spaceStatus === 'created' || spaceStatus === 'error') {
+    return (
+      <>
+        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        <PairScreen />
+      </>
+    );
+  }
 
   return (
     <>

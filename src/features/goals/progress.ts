@@ -1,8 +1,19 @@
 import { loadAllDays } from '@/features/canvas/storage';
+import { getSpaceId } from '@/features/sync/context';
+
+import { fetchGoalEntries } from './goals-cloud';
 import type { Goal, GoalEntry } from './types';
 
 /** All entries written on any day page, for every goal. */
 export async function loadGoalEntries(): Promise<GoalEntry[]> {
+  const spaceId = getSpaceId();
+  if (spaceId) {
+    try {
+      return await fetchGoalEntries(spaceId);
+    } catch {
+      // Offline: fall back to the copy on this phone.
+    }
+  }
   const days = await loadAllDays();
   return days.flatMap((day) =>
     day.items

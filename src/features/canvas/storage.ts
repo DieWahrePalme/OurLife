@@ -10,7 +10,7 @@ function isTask(value: unknown): value is Task {
 
 const keyFor = (dayNumber: number): string => `ourlife.day.${dayNumber}`;
 
-function isCanvasItem(value: unknown): value is CanvasItem {
+export function isCanvasItem(value: unknown): value is CanvasItem {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (

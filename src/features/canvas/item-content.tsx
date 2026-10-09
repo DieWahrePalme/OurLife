@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatAmount } from '@/features/goals/command';
 import { useGoalsStore } from '@/features/goals/goals-store';
 import { moodFor } from './moods';
+import { usePhotoUri } from './photo-cloud';
 import type { CanvasItem } from './types';
 import { strings } from '@/constants/strings';
 
@@ -32,6 +33,20 @@ function GoalChip({ item }: { item: CanvasItem }) {
   );
 }
 
+function PhotoContent({ item }: { item: CanvasItem }) {
+  const uri = usePhotoUri(item.content);
+  return (
+    <View style={styles.polaroid}>
+      <Image
+        source={uri ? { uri } : undefined}
+        style={{ width: PHOTO_WIDTH, aspectRatio: item.aspect ?? 1 }}
+        contentFit="cover"
+        accessibilityLabel={strings.photoLabel}
+      />
+    </View>
+  );
+}
+
 export function ItemContent({ item, onChange }: ItemContentProps) {
   switch (item.kind) {
     case 'sticker':
@@ -39,16 +54,7 @@ export function ItemContent({ item, onChange }: ItemContentProps) {
     case 'tape':
       return <View style={[styles.tape, { backgroundColor: item.color }]} />;
     case 'photo':
-      return (
-        <View style={styles.polaroid}>
-          <Image
-            source={{ uri: item.content }}
-            style={{ width: PHOTO_WIDTH, aspectRatio: item.aspect ?? 1 }}
-            contentFit="cover"
-            accessibilityLabel={strings.photoLabel}
-          />
-        </View>
-      );
+      return <PhotoContent item={item} />;
     case 'goal':
       return <GoalChip item={item} />;
     case 'mood': {

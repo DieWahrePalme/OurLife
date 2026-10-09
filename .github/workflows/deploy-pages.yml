@@ -30,6 +30,8 @@ jobs:
       - name: Export static web build
         env:
           GH_PAGES_BASE_PATH: /${{ github.event.repository.name }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: npx expo export --platform web
 
       - name: SPA fallback so deep links don't 404 on refresh

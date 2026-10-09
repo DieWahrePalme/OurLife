@@ -43,10 +43,10 @@ export function NewGoalForm({ colors, existingNames, onCreate }: NewGoalFormProp
 
   return (
     <View style={styles.form}>
-      <TextInput style={field} value={name} onChangeText={setName} placeholder={strings.goalNamePlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.goalNamePlaceholder} />
+      <TextInput style={field} value={name} onChangeText={setName} maxLength={80} placeholder={strings.goalNamePlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.goalNamePlaceholder} />
       <View style={styles.row}>
         <TextInput style={[field, styles.grow]} value={target} onChangeText={setTarget} keyboardType="decimal-pad" placeholder={strings.goalTargetPlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.goalTargetPlaceholder} />
-        <TextInput style={[field, styles.unit]} value={unit} onChangeText={setUnit} autoCapitalize="none" placeholder={strings.goalUnitPlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.goalUnitPlaceholder} />
+        <TextInput style={[field, styles.unit]} value={unit} onChangeText={setUnit} maxLength={20} autoCapitalize="none" placeholder={strings.goalUnitPlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.goalUnitPlaceholder} />
       </View>
       <TextInput style={field} value={deadline} onChangeText={setDeadline} autoCapitalize="none" placeholder={strings.goalDeadlinePlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.goalDeadlinePlaceholder} />
       {error ? (

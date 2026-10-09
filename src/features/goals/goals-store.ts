@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import { getSpaceId } from '@/features/sync/context';
+
+import { deleteGoal, fetchGoals, insertGoal } from './goals-cloud';
 import type { Goal } from './types';
 
 const STORAGE_KEY = 'ourlife.goals';
@@ -41,6 +44,16 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
       set({ goals: Array.isArray(parsed) ? parsed.filter(isGoal) : [], loaded: true, error: null });
     } catch {
       set({ loaded: true, error: 'Could not load your goals.' });
+      return;
+    }
+    const spaceId = getSpaceId();
+    if (!spaceId) return;
+    try {
+      const shared = await fetchGoals(spaceId);
+      set({ goals: shared, error: null });
+      await persist(shared);
+    } catch {
+      set({ error: 'No connection: showing the goals saved on this phone.' });
     }
   },
   addGoal: async (goal) => {
@@ -48,8 +61,10 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
     set({ goals: next });
     try {
       await persist(next);
+      const spaceId = getSpaceId();
+      if (spaceId) await insertGoal(spaceId, goal);
     } catch {
-      set({ error: 'Could not save your goal.' });
+      set({ error: 'Saved on this phone, but not synced yet.' });
     }
   },
   removeGoal: async (id) => {
@@ -57,8 +72,10 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
     set({ goals: next });
     try {
       await persist(next);
+      const spaceId = getSpaceId();
+      if (spaceId) await deleteGoal(spaceId, id);
     } catch {
-      set({ error: 'Could not save your change.' });
+      set({ error: 'Saved on this phone, but not synced yet.' });
     }
   },
 }));

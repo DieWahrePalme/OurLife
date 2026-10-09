@@ -4,11 +4,13 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorSchem
 import { Palette } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 import { PEN_COLORS } from '@/features/canvas/types';
+import { useSpaceStore } from '@/features/space/space-store';
 import { isValidStartDate, useSettingsStore } from '@/features/settings/settings-store';
 
 export default function SettingsScreen() {
   const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const { penColor, startDate, update } = useSettingsStore();
+  const pairCode = useSpaceStore((state) => state.pairCode);
   const [draftDate, setDraftDate] = useState(startDate);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
@@ -60,6 +62,14 @@ export default function SettingsScreen() {
       <Pressable accessibilityRole="button" onPress={saveDate} style={[styles.button, { backgroundColor: colors.dotPast }]}>
         <Text style={styles.buttonText}>{strings.settingsStartSave}</Text>
       </Pressable>
+
+      {pairCode ? (
+        <>
+          <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsSpaceTitle}</Text>
+          <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsSpaceHint}</Text>
+          <Text selectable style={[styles.input, styles.code, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.page }]}>{pairCode}</Text>
+        </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -73,6 +83,7 @@ const styles = StyleSheet.create({
   swatchHit: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
+  code: { paddingVertical: 12, lineHeight: 24 },
   button: { minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

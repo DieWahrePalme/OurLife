@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CanvasItemView } from './canvas-item';
+import { deletePhoto, isCloudPhoto, uploadPhoto } from './photo-cloud';
 import { pickPhoto } from './photos';
 import { MoodSheet } from './mood-sheet';
 import { StickerSheet } from './sticker-sheet';
@@ -15,6 +16,7 @@ import { strings } from '@/constants/strings';
 import { commandText, isGoalCommand, parseGoalCommand } from '@/features/goals/command';
 import { useSettingsStore } from '@/features/settings/settings-store';
 import { useGoalsStore } from '@/features/goals/goals-store';
+import { getSpaceId } from '@/features/sync/context';
 
 interface DayCanvasProps {
   dayNumber: number;
@@ -23,6 +25,16 @@ interface DayCanvasProps {
 
 const TAPE_COLORS = [PEN_COLORS[1], PEN_COLORS[2], PEN_COLORS[4], PEN_COLORS[5]] as const;
 const SPAWN_SPREAD = 60;
+const SPAWN_MARGIN = 8;
+const DEFAULT_SPAWN_WIDTH = 120;
+/** Rough on-page width of each item kind, so wide items start inside the page instead of off its edge. */
+const SPAWN_WIDTH: Partial<Record<CanvasItem['kind'], number>> = { photo: 216, todo: 210, focus: 210, tape: 120 };
+
+function spawnX(kind: CanvasItem['kind'], pageWidth: number, jitter: number): number {
+  const width = SPAWN_WIDTH[kind] ?? DEFAULT_SPAWN_WIDTH;
+  const centred = pageWidth / 2 - width / 2 + jitter;
+  return Math.max(Math.min(centred, pageWidth - width - SPAWN_MARGIN), SPAWN_MARGIN);
+}
 const SPAWN_ROWS = 6;
 const SPAWN_ROW_HEIGHT = 90;
 /** A tap on an item also reaches the page underneath (on web); ignore that page tap. */
@@ -64,11 +76,11 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const selected = items.find((it) => it.id === selectedId) ?? null;
 
   const spawn = useCallback(
-    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect' | 'tasks' | 'amount'>) => {
+    (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect' | 'tasks' | 'amount'> & Partial<Pick<CanvasItem, 'id'>>) => {
       const jitter = () => (Math.random() - 0.5) * SPAWN_SPREAD;
       const item: CanvasItem = {
         id: newId(),
-        x: Math.max(pageSize.width / 2 - 60 + jitter(), 8),
+        x: spawnX(partial.kind, pageSize.width, jitter()),
         y: Math.max(pageSize.height / 8 + (items.length % SPAWN_ROWS) * SPAWN_ROW_HEIGHT + jitter() / 3, 8),
         scale: 1,
         rotation: 0,
@@ -85,7 +97,16 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     try {
       const id = newId();
       const photo = await pickPhoto(id);
-      if (photo) spawn({ kind: 'photo', content: photo.uri, color: penColor, aspect: photo.aspect });
+      if (!photo) return;
+      // Shown at once from the local copy; the cloud copy replaces it when the upload is done.
+      spawn({ id, kind: 'photo', content: photo.uri, color: penColor, aspect: photo.aspect });
+      const spaceId = getSpaceId();
+      if (!spaceId) return;
+      try {
+        update(id, { content: await uploadPhoto(spaceId, id, photo.uri) });
+      } catch {
+        setPhotoError(strings.photoNotShared);
+      }
     } catch {
       setPhotoError(strings.photoFailed);
     }
@@ -122,10 +143,12 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
 
   const removeItem = useCallback(
     (id: string) => {
+      const removed = items.find((it) => it.id === id);
+      if (removed?.kind === 'photo' && isCloudPhoto(removed.content)) deletePhoto(removed.content);
       remove(id);
       setSelectedId((current) => (current === id ? null : current));
     },
-    [remove],
+    [remove, items],
   );
 
   const onSelect = useCallback((id: string) => {

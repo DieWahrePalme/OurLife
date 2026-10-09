@@ -3,6 +3,8 @@ import { create } from 'zustand';
 
 import { DEFAULT_START_DATE } from '@/constants/theme';
 import { DEFAULT_PEN_COLOR, PEN_COLORS } from '@/features/canvas/types';
+import { updateStartDateOnServer } from '@/features/space/space-api';
+import { getSpaceId } from '@/features/sync/context';
 
 const STORAGE_KEY = 'ourlife.settings';
 
@@ -53,6 +55,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const { startDate, penColor } = get();
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ startDate, penColor }));
+      const spaceId = getSpaceId();
+      if (spaceId && patch.startDate) await updateStartDateOnServer(spaceId, patch.startDate);
     } catch {
       set({ error: 'Could not save your settings.' });
     }
