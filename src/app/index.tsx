@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { useSettingsStore } from '@/features/settings/settings-store';
+import { useSpaceStore } from '@/features/space/space-store';
 import { DayGrid } from '@/components/day-grid';
 import { Palette } from '@/constants/theme';
 import { strings } from '@/constants/strings';
@@ -10,6 +11,7 @@ import { dayNumberFor, formatDay, parseIsoDate, todayStamp } from '@/lib/dates';
 
 export default function HomeScreen() {
   const startDate = useSettingsStore((state) => state.startDate);
+  const spaceName = useSpaceStore((state) => (state.status === 'ready' ? state.spaceName : null));
   const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const startStamp = parseIsoDate(startDate);
   const todayNumber = dayNumberFor(startStamp, todayStamp());
@@ -30,7 +32,10 @@ export default function HomeScreen() {
         <Text accessibilityRole="header" style={[styles.number, { color: colors.ink }]}>
           {strings.dayTitle(todayNumber)}
         </Text>
-        <Text style={[styles.sub, { color: colors.inkSoft }]}>{strings.together(formatDay(startStamp))}</Text>
+        <Text style={[styles.sub, { color: colors.inkSoft }]}>
+          {spaceName ? `${spaceName} · ` : ''}
+          {strings.together(formatDay(startStamp))}
+        </Text>
       </View>
       <DayGrid startStamp={startStamp} todayNumber={todayNumber} colors={colors} />
     </SafeAreaView>

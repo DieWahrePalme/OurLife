@@ -7,6 +7,8 @@ import type { Goal } from '@/features/goals/types';
 
 const GOALS_KEY = 'ourlife.goals';
 const DAY_KEY_PREFIX = 'ourlife.day.';
+const SYNC_STATE_PREFIX = 'ourlife.base.';
+const GOALS_PENDING_KEY = 'ourlife.goals.pending';
 
 /** First phone: copies the days and goals already on this phone into the new shared space. */
 export async function uploadLocalData(spaceId: string): Promise<void> {
@@ -23,6 +25,8 @@ export async function uploadLocalData(spaceId: string): Promise<void> {
 
 /** Second phone: its own test data must not mix with the shared space, so the local copy is dropped. */
 export async function clearLocalData(): Promise<void> {
-  const keys = (await AsyncStorage.getAllKeys()).filter((k) => k === GOALS_KEY || k.startsWith(DAY_KEY_PREFIX));
+  const keys = (await AsyncStorage.getAllKeys()).filter(
+    (k) => k === GOALS_KEY || k === GOALS_PENDING_KEY || k.startsWith(DAY_KEY_PREFIX) || k.startsWith(SYNC_STATE_PREFIX),
+  );
   if (keys.length > 0) await AsyncStorage.multiRemove(keys);
 }

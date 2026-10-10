@@ -4,13 +4,14 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorSchem
 import { Palette } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 import { PEN_COLORS } from '@/features/canvas/types';
+import { SpaceSection } from '@/features/space/space-section';
 import { useSpaceStore } from '@/features/space/space-store';
 import { isValidStartDate, useSettingsStore } from '@/features/settings/settings-store';
 
 export default function SettingsScreen() {
   const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
   const { penColor, startDate, update } = useSettingsStore();
-  const pairCode = useSpaceStore((state) => state.pairCode);
+  const inSpace = useSpaceStore((state) => state.status === 'ready');
   const [draftDate, setDraftDate] = useState(startDate);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
@@ -63,13 +64,7 @@ export default function SettingsScreen() {
         <Text style={styles.buttonText}>{strings.settingsStartSave}</Text>
       </Pressable>
 
-      {pairCode ? (
-        <>
-          <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsSpaceTitle}</Text>
-          <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsSpaceHint}</Text>
-          <Text selectable style={[styles.input, styles.code, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.page }]}>{pairCode}</Text>
-        </>
-      ) : null}
+      {inSpace ? <SpaceSection colors={colors} /> : null}
     </ScrollView>
   );
 }

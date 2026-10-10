@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatAmount } from '@/features/goals/command';
 import { useGoalsStore } from '@/features/goals/goals-store';
 import { moodFor } from './moods';
+import { isKlipyUrl } from './klipy';
 import { usePhotoUri } from './photo-cloud';
 import type { CanvasItem } from './types';
 import { strings } from '@/constants/strings';
@@ -12,6 +13,7 @@ const PHOTO_WIDTH = 200;
 const TAPE_WIDTH = 120;
 const TAPE_HEIGHT = 34;
 const STICKER_SIZE = 56;
+const IMAGE_STICKER_SIZE = 140;
 const CARD_WIDTH = 210;
 const INK = '#2E2B3A';
 
@@ -47,10 +49,22 @@ function PhotoContent({ item }: { item: CanvasItem }) {
   );
 }
 
+/** A sticker or GIF from the library. Only KLIPY's own address is loaded, whatever a synced item says. */
+function ImageSticker({ item }: { item: CanvasItem }) {
+  return (
+    <Image
+      source={isKlipyUrl(item.content) ? { uri: item.content } : undefined}
+      style={{ width: IMAGE_STICKER_SIZE, aspectRatio: item.aspect ?? 1 }}
+      contentFit="contain"
+      accessibilityLabel={strings.stickerLabel}
+    />
+  );
+}
+
 export function ItemContent({ item, onChange }: ItemContentProps) {
   switch (item.kind) {
     case 'sticker':
-      return <Text style={styles.sticker}>{item.content}</Text>;
+      return isKlipyUrl(item.content) ? <ImageSticker item={item} /> : <Text style={styles.sticker}>{item.content}</Text>;
     case 'tape':
       return <View style={[styles.tape, { backgroundColor: item.color }]} />;
     case 'photo':

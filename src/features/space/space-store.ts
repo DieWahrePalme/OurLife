@@ -2,11 +2,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { useSettingsStore } from '@/features/settings/settings-store';
-import { setSpaceId } from '@/features/sync/context';
+import { getSpaceId, setSpaceId } from '@/features/sync/context';
 import { supabase } from '@/lib/supabase';
 
+import { insertGoal } from '@/features/goals/goals-cloud';
+import type { Goal } from '@/features/goals/types';
+
 import { clearLocalData, uploadLocalData } from './migrate-local';
-import { createSpaceOnServer, ensureSession, fetchMySpace, joinSpaceOnServer, type SpaceInfo } from './space-api';
+import {
+  DEFAULT_SPACE_NAME,
+  createSpaceOnServer,
+  ensureSession,
+  fetchMySpace,
+  joinSpaceOnServer,
+  rotatePairCodeOnServer,
+  updateSpaceNameOnServer,
+  type NewSpaceSetup,
+  type SpaceInfo,
+} from './space-api';
 
 const CACHE_KEY = 'ourlife.space';
 const CODE_PATTERN = /^[0-9a-f]{24}$/;
@@ -17,24 +30,45 @@ const CODE_PATTERN = /^[0-9a-f]{24}$/;
  */
 export type SpaceStatus = 'loading' | 'pairing' | 'created' | 'ready' | 'local' | 'error';
 
+const REMOVED_MESSAGE = 'You were removed from your space. Join again with a new code.';
+
 interface SpaceState {
   status: SpaceStatus;
+  spaceName: string;
   pairCode: string | null;
   /** Shown once after creating the space (e.g. when copying the local pages failed). */
   notice: string | null;
   error: string | null;
   init: () => Promise<void>;
-  createSpace: (startDate: string) => Promise<void>;
-  joinSpace: (code: string) => Promise<void>;
+  createSpace: (setup: NewSpaceSetup, goals: readonly Goal[]) => Promise<void>;
+  joinSpace: (code: string, memberName: string) => Promise<void>;
   confirmCreated: () => void;
+  renameSpace: (name: string) => Promise<void>;
+  newPairCode: () => Promise<void>;
 }
 
 function readCache(raw: string | null): SpaceInfo | null {
   if (!raw) return null;
   const parsed: unknown = JSON.parse(raw);
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const { id, startDate, pairCode } = parsed as Record<string, unknown>;
-  return typeof id === 'string' && typeof startDate === 'string' && typeof pairCode === 'string' ? { id, startDate, pairCode } : null;
+  const { id, name, startDate, pairCode } = parsed as Record<string, unknown>;
+  if (typeof id !== 'string' || typeof startDate !== 'string' || typeof pairCode !== 'string') return null;
+  return { id, name: typeof name === 'string' && name ? name : DEFAULT_SPACE_NAME, startDate, pairCode };
+}
+
+/** The saved copy says this phone is in a space; ask the server. Null = no longer a member, 'unreachable' = no connection. */
+async function fetchFreshSpace(): Promise<SpaceInfo | null | 'unreachable'> {
+  try {
+    return await fetchMySpace(await ensureSession());
+  } catch {
+    return 'unreachable';
+  }
+}
+
+async function forgetSpace(): Promise<void> {
+  setSpaceId(null);
+  await AsyncStorage.removeItem(CACHE_KEY);
+  await clearLocalData();
 }
 
 async function remember(space: SpaceInfo): Promise<void> {
@@ -52,6 +86,7 @@ function messageOf(error: unknown, fallback: string): string {
 
 export const useSpaceStore = create<SpaceState>((set) => ({
   status: 'loading',
+  spaceName: DEFAULT_SPACE_NAME,
   pairCode: null,
   notice: null,
   error: null,
@@ -67,20 +102,25 @@ export const useSpaceStore = create<SpaceState>((set) => ({
       if (cached) {
         // Open at once from the saved copy, so the app also starts without internet.
         adopt(cached);
-        set({ status: 'ready', pairCode: cached.pairCode });
-        const fresh = await ensureSession().then(fetchMySpace).catch(() => null);
-        if (fresh) {
-          adopt(fresh);
-          set({ pairCode: fresh.pairCode });
-          await remember(fresh);
+        set({ status: 'ready', spaceName: cached.name, pairCode: cached.pairCode });
+        const fresh = await fetchFreshSpace();
+        if (fresh === 'unreachable') return;
+        if (!fresh) {
+          // Another member removed this phone.
+          await forgetSpace();
+          set({ status: 'pairing', pairCode: null, error: REMOVED_MESSAGE });
+          return;
         }
+        adopt(fresh);
+        set({ spaceName: fresh.name, pairCode: fresh.pairCode });
+        await remember(fresh);
         return;
       }
       const space = await fetchMySpace(await ensureSession());
       if (space) {
         adopt(space);
         await remember(space);
-        set({ status: 'ready', pairCode: space.pairCode });
+        set({ status: 'ready', spaceName: space.name, pairCode: space.pairCode });
       } else {
         set({ status: 'pairing' });
       }
@@ -89,26 +129,27 @@ export const useSpaceStore = create<SpaceState>((set) => ({
     }
   },
 
-  createSpace: async (startDate) => {
+  createSpace: async (setup, goals) => {
     set({ error: null });
     try {
       await ensureSession();
-      const space = await createSpaceOnServer(startDate);
+      const space = await createSpaceOnServer(setup);
       adopt(space);
       await remember(space);
       let notice: string | null = null;
       try {
         await uploadLocalData(space.id);
+        for (const goal of goals) await insertGoal(space.id, goal);
       } catch {
-        notice = 'Your space is ready, but the pages already on this phone could not be copied. Try again from Settings later.';
+        notice = 'Your space is ready, but some pages or goals could not be saved. Add them again inside the app.';
       }
-      set({ status: 'created', pairCode: space.pairCode, notice });
+      set({ status: 'created', spaceName: space.name, pairCode: space.pairCode, notice });
     } catch (error) {
       set({ error: messageOf(error, 'Could not create your space.') });
     }
   },
 
-  joinSpace: async (code) => {
+  joinSpace: async (code, memberName) => {
     const clean = code.trim().toLowerCase();
     if (!CODE_PATTERN.test(clean)) {
       set({ error: 'That code does not look right. It has 24 letters and numbers.' });
@@ -117,19 +158,36 @@ export const useSpaceStore = create<SpaceState>((set) => ({
     set({ error: null });
     try {
       await ensureSession();
-      const space = await joinSpaceOnServer(clean);
+      const space = await joinSpaceOnServer(clean, memberName.trim());
       if (!space) {
-        set({ error: 'That code did not work, or your space already has two people.' });
+        set({ error: 'That code did not work, or the space is full.' });
         return;
       }
       await clearLocalData();
       adopt(space);
       await remember(space);
-      set({ status: 'ready', pairCode: space.pairCode });
+      set({ status: 'ready', spaceName: space.name, pairCode: space.pairCode });
     } catch (error) {
       set({ error: messageOf(error, 'Could not join. Check your internet and try again.') });
     }
   },
 
   confirmCreated: () => set({ status: 'ready', notice: null }),
+
+  renameSpace: async (name) => {
+    const spaceId = getSpaceId();
+    const clean = name.trim();
+    if (!spaceId || !clean) return;
+    await updateSpaceNameOnServer(spaceId, clean);
+    set({ spaceName: clean });
+    const cached = readCache(await AsyncStorage.getItem(CACHE_KEY));
+    if (cached) await remember({ ...cached, name: clean });
+  },
+
+  newPairCode: async () => {
+    const code = await rotatePairCodeOnServer();
+    set({ pairCode: code });
+    const cached = readCache(await AsyncStorage.getItem(CACHE_KEY));
+    if (cached) await remember({ ...cached, pairCode: code });
+  },
 }));

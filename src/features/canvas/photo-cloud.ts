@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
 
-const BUCKET = 'photos';
+export const PHOTO_BUCKET = 'photos';
+const BUCKET = PHOTO_BUCKET;
 /** Photos in the cloud are stored as "storage:<path>" in the item, so any phone can find them. */
 const REF_PREFIX = 'storage:';
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -14,8 +15,14 @@ const EXTENSION_BY_TYPE: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  'image/gif': 'gif',
   'image/heic': 'heic',
 };
+
+/** The reference stored in an item for a file in the bucket. */
+export function cloudRef(path: string): string {
+  return `${REF_PREFIX}${path}`;
+}
 
 export function isCloudPhoto(content: string): boolean {
   return content.startsWith(REF_PREFIX);
@@ -25,17 +32,23 @@ function pathOf(content: string): string {
   return content.slice(REF_PREFIX.length);
 }
 
+/** Uploads a local image to `path` in the private bucket. Returns the reference to store in an item. */
+export async function uploadImage(path: string, localUri: string): Promise<string> {
+  if (!supabase) throw new Error('Cloud is not configured');
+  const blob = await (await fetch(localUri)).blob();
+  if (!EXTENSION_BY_TYPE[blob.type]) throw new Error('This image type is not supported');
+  if (blob.size > MAX_BYTES) throw new Error('This image is too large (10 MB at most)');
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, upsert: false });
+  if (error) throw error;
+  return cloudRef(path);
+}
+
 /** Uploads a picked photo to `<space_id>/<item_id>.<ext>`. Returns the reference to store in the item. */
 export async function uploadPhoto(spaceId: string, itemId: string, localUri: string): Promise<string> {
-  if (!supabase) throw new Error('Cloud is not configured');
   const blob = await (await fetch(localUri)).blob();
   const extension = EXTENSION_BY_TYPE[blob.type];
   if (!extension) throw new Error('This photo type is not supported');
-  if (blob.size > MAX_BYTES) throw new Error('This photo is too large (10 MB at most)');
-  const path = `${spaceId}/${itemId}.${extension}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, upsert: false });
-  if (error) throw error;
-  return `${REF_PREFIX}${path}`;
+  return uploadImage(`${spaceId}/${itemId}.${extension}`, localUri);
 }
 
 /** Best effort: a photo left behind in the bucket is harmless, so failures are ignored. */

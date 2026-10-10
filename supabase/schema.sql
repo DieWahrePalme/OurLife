@@ -1,7 +1,8 @@
--- OurLife: draft schema for Supabase. NOT applied yet.
--- Moritz runs this himself once a Supabase project exists (SQL editor or CLI).
--- Model: no sign-up. Each phone signs in anonymously, then pairs into one "space"
--- with a long random code. Row Level Security ties every row to the space.
+-- OurLife: schema for Supabase (full state, includes migration-002-members.sql).
+-- Moritz runs this himself on a fresh project (SQL editor or CLI). The live project got
+-- the first version, then migration-002-members.sql.
+-- Model: no sign-up. Each phone signs in anonymously, then joins one "space"
+-- (up to 20 people, all admins) with a long random code. Row Level Security ties every row to the space.
 -- Only the anon/publishable key is ever used in the app. Never a service_role key.
 --
 -- Supabase dashboard settings to do together with this file:
@@ -14,6 +15,7 @@
 
 create table public.spaces (
   id          uuid primary key default gen_random_uuid(),
+  name        text not null default 'Our space' check (length(name) between 1 and 60),
   start_date  date not null,
   -- The pairing code is the only secret: 24 hex characters (96 bits of real randomness).
   pair_code   text not null unique default encode(extensions.gen_random_bytes(12), 'hex'),
@@ -23,6 +25,7 @@ create table public.spaces (
 create table public.space_members (
   space_id    uuid not null references public.spaces (id) on delete cascade,
   user_id     uuid not null default auth.uid(),
+  nickname    text not null default '' check (length(nickname) <= 40),
   joined_at   timestamptz not null default now(),
   primary key (space_id, user_id),
   -- One phone belongs to exactly one space.
@@ -60,8 +63,9 @@ create table public.goals (
 revoke all on public.spaces, public.space_members, public.day_items, public.goals from anon;
 revoke insert, delete on public.spaces from authenticated;
 revoke update on public.spaces from authenticated;
-grant update (start_date) on public.spaces to authenticated;      -- never pair_code or id
+grant update (start_date, name) on public.spaces to authenticated;      -- never pair_code or id
 revoke insert, update, delete on public.space_members from authenticated;  -- only via the functions below
+grant update (nickname) on public.space_members to authenticated;
 revoke update (space_id) on public.day_items from authenticated;
 revoke update (space_id) on public.goals from authenticated;
 
@@ -97,6 +101,8 @@ create policy "members change start date"  on public.spaces
 
 create policy "members see members"        on public.space_members
   for select using (public.is_space_member(space_id));
+create policy "members rename themselves"  on public.space_members
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 create policy "members use day items"      on public.day_items
   for all using (public.is_space_member(space_id)) with check (public.is_space_member(space_id));
@@ -109,7 +115,7 @@ create policy "members use goals"          on public.goals
 
 -- ---------------------------------------------------------------- guards
 
--- Exactly two people per space, even if someone bypasses the functions.
+-- At most 20 people per space, even if someone bypasses the functions.
 create or replace function public.cap_members()
 returns trigger
 language plpgsql
@@ -117,7 +123,7 @@ set search_path = ''
 as $$
 begin
   perform 1 from public.spaces where id = new.space_id for update;  -- serialise concurrent joins
-  if (select count(*) from public.space_members where space_id = new.space_id) >= 2 then
+  if (select count(*) from public.space_members where space_id = new.space_id) >= 20 then
     raise exception 'Space is full';
   end if;
   return new;
@@ -146,10 +152,9 @@ create trigger lock_space_id_items before update on public.day_items
 create trigger lock_space_id_goals before update on public.goals
   for each row execute function public.lock_space_id();
 
--- ---------------------------------------------------------------- pairing
+-- ---------------------------------------------------------------- pairing and admin actions
 
--- First phone: creates "our space" and becomes its first member. Returns the code to share.
-create or replace function public.create_space(start_date date)
+create or replace function public.create_space(start_date date, space_name text, member_name text)
 returns table (space_id uuid, pair_code text)
 language plpgsql
 security definer
@@ -164,15 +169,18 @@ begin
   if exists (select 1 from public.space_members where user_id = auth.uid()) then
     raise exception 'This phone is already in a space';
   end if;
-  insert into public.spaces (start_date) values (create_space.start_date) returning * into new_space;
-  insert into public.space_members (space_id, user_id) values (new_space.id, auth.uid());
+  insert into public.spaces (start_date, name)
+    values (create_space.start_date, coalesce(nullif(trim(space_name), ''), 'Our space'))
+    returning * into new_space;
+  insert into public.space_members (space_id, user_id, nickname)
+    values (new_space.id, auth.uid(), left(trim(coalesce(member_name, '')), 40));
   return query select new_space.id, new_space.pair_code;
 end;
 $$;
 
--- Second phone: enters the code. Returns the space id, or null if the code is wrong
--- or the space is full (same answer for both, so nothing leaks about which codes exist).
-create or replace function public.join_space(code text)
+-- Enter the code. Returns the space id, or null if the code is wrong or the space is full
+-- (same answer for both, so nothing leaks about which codes exist).
+create or replace function public.join_space(code text, member_name text default '')
 returns uuid
 language plpgsql
 security definer
@@ -195,7 +203,8 @@ begin
     return case when own_space = found_space then found_space else null end;
   end if;
   begin
-    insert into public.space_members (space_id, user_id) values (found_space, auth.uid());
+    insert into public.space_members (space_id, user_id, nickname)
+      values (found_space, auth.uid(), left(trim(coalesce(member_name, '')), 40));
   exception when others then
     return null;  -- space is full
   end;
@@ -203,10 +212,58 @@ begin
 end;
 $$;
 
-revoke all on function public.create_space(date) from public, anon;
-revoke all on function public.join_space(text)   from public, anon;
-grant execute on function public.create_space(date) to authenticated;
-grant execute on function public.join_space(text)   to authenticated;
+-- ---------------------------------------------------------------- admin actions (every member is an admin)
+
+-- Removes another member (for example the old session of a lost phone).
+create or replace function public.remove_member(target_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  my_space uuid;
+begin
+  select space_id into my_space from public.space_members where user_id = auth.uid();
+  if my_space is null then
+    raise exception 'Not in a space';
+  end if;
+  if target_user = auth.uid() then
+    raise exception 'Remove this phone from another phone';
+  end if;
+  delete from public.space_members where space_id = my_space and user_id = target_user;
+end;
+$$;
+
+-- Makes the old code useless. Returns the new one.
+create or replace function public.rotate_pair_code()
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  my_space uuid;
+  new_code text;
+begin
+  select space_id into my_space from public.space_members where user_id = auth.uid();
+  if my_space is null then
+    raise exception 'Not in a space';
+  end if;
+  update public.spaces set pair_code = encode(extensions.gen_random_bytes(12), 'hex')
+    where id = my_space returning pair_code into new_code;
+  return new_code;
+end;
+$$;
+
+revoke all on function public.create_space(date, text, text) from public, anon;
+revoke all on function public.join_space(text, text)         from public, anon;
+revoke all on function public.remove_member(uuid)            from public, anon;
+revoke all on function public.rotate_pair_code()             from public, anon;
+grant execute on function public.create_space(date, text, text) to authenticated;
+grant execute on function public.join_space(text, text)         to authenticated;
+grant execute on function public.remove_member(uuid)            to authenticated;
+grant execute on function public.rotate_pair_code()             to authenticated;
 
 -- ---------------------------------------------------------------- live sync
 
@@ -218,7 +275,7 @@ alter publication supabase_realtime add table public.goals;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('photos', 'photos', false, 10485760,
-        array['image/jpeg', 'image/png', 'image/webp', 'image/heic'])
+        array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/gif'])
 on conflict (id) do update
   set file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 

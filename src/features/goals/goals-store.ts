@@ -7,6 +7,39 @@ import { deleteGoal, fetchGoals, insertGoal } from './goals-cloud';
 import type { Goal } from './types';
 
 const STORAGE_KEY = 'ourlife.goals';
+const PENDING_KEY = 'ourlife.goals.pending';
+const NOT_SYNCED = 'Saved on this phone, will sync when you are online.';
+
+/** Goal changes made while offline that the cloud has not seen yet. */
+interface PendingGoals {
+  added: readonly Goal[];
+  removedIds: readonly string[];
+}
+
+const NOTHING_PENDING: PendingGoals = { added: [], removedIds: [] };
+
+async function readPending(): Promise<PendingGoals> {
+  const raw = await AsyncStorage.getItem(PENDING_KEY);
+  const parsed: unknown = raw ? JSON.parse(raw) : null;
+  if (typeof parsed !== 'object' || parsed === null) return NOTHING_PENDING;
+  const { added, removedIds } = parsed as Record<string, unknown>;
+  return {
+    added: Array.isArray(added) ? added.filter(isGoal) : [],
+    removedIds: Array.isArray(removedIds) ? removedIds.filter((id): id is string => typeof id === 'string') : [],
+  };
+}
+
+async function writePending(pending: PendingGoals): Promise<void> {
+  await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+}
+
+/** Sends the offline changes. Safe to repeat: adding twice or deleting twice changes nothing. */
+async function flushPending(spaceId: string): Promise<void> {
+  const pending = await readPending();
+  for (const goal of pending.added) await insertGoal(spaceId, goal);
+  for (const id of pending.removedIds) await deleteGoal(spaceId, id);
+  if (pending.added.length > 0 || pending.removedIds.length > 0) await writePending(NOTHING_PENDING);
+}
 
 function isGoal(value: unknown): value is Goal {
   if (typeof value !== 'object' || value === null) return false;
@@ -49,6 +82,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
     const spaceId = getSpaceId();
     if (!spaceId) return;
     try {
+      await flushPending(spaceId);
       const shared = await fetchGoals(spaceId);
       set({ goals: shared, error: null });
       await persist(shared);
@@ -62,9 +96,16 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
     try {
       await persist(next);
       const spaceId = getSpaceId();
-      if (spaceId) await insertGoal(spaceId, goal);
+      if (!spaceId) return;
+      try {
+        await insertGoal(spaceId, goal);
+      } catch {
+        const pending = await readPending();
+        await writePending({ ...pending, added: [...pending.added, goal] });
+        set({ error: NOT_SYNCED });
+      }
     } catch {
-      set({ error: 'Saved on this phone, but not synced yet.' });
+      set({ error: 'Could not save your goal.' });
     }
   },
   removeGoal: async (id) => {
@@ -73,9 +114,20 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
     try {
       await persist(next);
       const spaceId = getSpaceId();
-      if (spaceId) await deleteGoal(spaceId, id);
+      if (!spaceId) return;
+      try {
+        await deleteGoal(spaceId, id);
+      } catch {
+        const pending = await readPending();
+        const neverSynced = pending.added.some((g) => g.id === id);
+        await writePending({
+          added: pending.added.filter((g) => g.id !== id),
+          removedIds: neverSynced ? pending.removedIds : [...pending.removedIds, id],
+        });
+        set({ error: NOT_SYNCED });
+      }
     } catch {
-      set({ error: 'Saved on this phone, but not synced yet.' });
+      set({ error: 'Could not delete your goal.' });
     }
   },
 }));

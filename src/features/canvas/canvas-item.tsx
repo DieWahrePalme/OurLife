@@ -8,10 +8,13 @@ import { strings } from '@/constants/strings';
 import { useGoalsStore } from '@/features/goals/goals-store';
 import { ItemContent } from './item-content';
 import { moodFor } from './moods';
+import { isKlipyUrl } from './klipy';
 import { MAX_SCALE, MIN_SCALE, type CanvasItem, type ItemKind } from './types';
 
 interface CanvasItemViewProps {
   item: CanvasItem;
+  /** Scale of the page on this screen; drags are divided by it so items follow the finger. */
+  pageScale: number;
   selected: boolean;
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
@@ -33,11 +36,11 @@ function labelFor(item: CanvasItem, goalName: string | undefined): string {
   if (item.kind === 'todo') return strings.todoTitle;
   if (item.kind === 'mood') return moodFor(item.content).label;
   if (item.kind === 'goal') return `${goalName ?? 'Goal'} ${item.amount ?? ''}`.trim();
-  if (item.kind === 'sticker') return `Sticker ${item.content}`;
+  if (item.kind === 'sticker') return isKlipyUrl(item.content) ? strings.stickerLabel : `Sticker ${item.content}`;
   return item.content;
 }
 
-function CanvasItemViewBase({ item, selected, onSelect, onEdit, onChange, onRemove }: CanvasItemViewProps) {
+function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onChange, onRemove }: CanvasItemViewProps) {
   const goalName = useGoalsStore((state) => state.goals.find((g) => g.id === item.content)?.name);
   const x = useSharedValue(item.x);
   const y = useSharedValue(item.y);
@@ -60,8 +63,9 @@ function CanvasItemViewBase({ item, selected, onSelect, onEdit, onChange, onRemo
       scheduleOnRN(onSelect, item.id);
     })
     .onUpdate((e) => {
-      x.value = startX.value + e.translationX;
-      y.value = startY.value + e.translationY;
+      const divisor = pageScale > 0 ? pageScale : 1;
+      x.value = startX.value + e.translationX / divisor;
+      y.value = startY.value + e.translationY / divisor;
     })
     .onEnd(() => scheduleOnRN(commit, x.value, y.value, scale.value, rotation.value));
 

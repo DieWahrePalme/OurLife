@@ -35,6 +35,11 @@ function spawnX(kind: CanvasItem['kind'], pageWidth: number, jitter: number): nu
   const centred = pageWidth / 2 - width / 2 + jitter;
   return Math.max(Math.min(centred, pageWidth - width - SPAWN_MARGIN), SPAWN_MARGIN);
 }
+/** The page has the same logical size on every device; it is scaled to fit the screen. */
+export const PAGE_WIDTH = 360;
+export const PAGE_HEIGHT = 580;
+const MAX_PAGE_SCALE = 1.5;
+const PAGE_PADDING = 12;
 const SPAWN_ROWS = 6;
 const SPAWN_ROW_HEIGHT = 90;
 /** A tap on an item also reaches the page underneath (on web); ignore that page tap. */
@@ -60,7 +65,12 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const { items, canEdit, error, add, update, remove, bringToFront } = useDayItems(dayNumber);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const lastSelectAt = useRef(0);
-  const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
+  const [available, setAvailable] = useState({ width: 0, height: 0 });
+  const pageScale = Math.min(
+    MAX_PAGE_SCALE,
+    Math.max((available.width - PAGE_PADDING * 2) / PAGE_WIDTH, 0),
+    Math.max((available.height - PAGE_PADDING * 2) / PAGE_HEIGHT, 0),
+  );
   const penColor = useSettingsStore((state) => state.penColor);
   const goals = useGoalsStore((state) => state.goals);
   const loadGoals = useGoalsStore((state) => state.load);
@@ -80,8 +90,8 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
       const jitter = () => (Math.random() - 0.5) * SPAWN_SPREAD;
       const item: CanvasItem = {
         id: newId(),
-        x: spawnX(partial.kind, pageSize.width, jitter()),
-        y: Math.max(pageSize.height / 8 + (items.length % SPAWN_ROWS) * SPAWN_ROW_HEIGHT + jitter() / 3, 8),
+        x: spawnX(partial.kind, PAGE_WIDTH, jitter()),
+        y: Math.max(PAGE_HEIGHT / 8 + (items.length % SPAWN_ROWS) * SPAWN_ROW_HEIGHT + jitter() / 3, 8),
         scale: 1,
         rotation: 0,
         ...partial,
@@ -89,7 +99,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
       add(item);
       setSelectedId(item.id);
     },
-    [add, pageSize, items.length],
+    [add, items.length],
   );
 
   const addPhoto = async () => {
@@ -159,27 +169,32 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <View style={styles.pageWrap}>
-        <Pressable
-          accessible={false}
-          onPress={() => {
-            if (Date.now() - lastSelectAt.current > SELECT_GRACE_MS) setSelectedId(null);
-          }}
-          onLayout={(e) => setPageSize(e.nativeEvent.layout)}
-          style={[styles.page, { backgroundColor: colors.page, borderColor: colors.line }]}
-        >
-          {items.map((item) => (
-            <CanvasItemView
-              key={item.id}
-              item={item}
-              selected={item.id === selectedId}
-              onSelect={onSelect}
-              onEdit={onEdit}
-              onChange={update}
-              onRemove={removeItem}
-            />
-          ))}
-        </Pressable>
+      <View style={styles.pageWrap} onLayout={(e) => setAvailable(e.nativeEvent.layout)}>
+        <View style={{ width: PAGE_WIDTH * pageScale, height: PAGE_HEIGHT * pageScale, alignSelf: 'center' }}>
+          <Pressable
+            accessible={false}
+            onPress={() => {
+              if (Date.now() - lastSelectAt.current > SELECT_GRACE_MS) setSelectedId(null);
+            }}
+            style={[
+              styles.page,
+              { backgroundColor: colors.page, borderColor: colors.line, transform: [{ scale: pageScale }] },
+            ]}
+          >
+            {items.map((item) => (
+              <CanvasItemView
+                key={item.id}
+                item={item}
+                pageScale={pageScale}
+                selected={item.id === selectedId}
+                onSelect={onSelect}
+                onEdit={onEdit}
+                onChange={update}
+                onRemove={removeItem}
+              />
+            ))}
+          </Pressable>
+        </View>
         {error ?? photoError ? (
           <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.today }]}>
             {error ?? photoError}
@@ -230,8 +245,8 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         visible={stickerOpen}
         colors={colors}
         onClose={() => setStickerOpen(false)}
-        onPick={(glyph) => {
-          spawn({ kind: 'sticker', content: glyph, color: penColor });
+        onPick={(content, aspect) => {
+          spawn({ kind: 'sticker', content, color: penColor, aspect });
           setStickerOpen(false);
         }}
       />
@@ -241,7 +256,14 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, width: '100%' },
-  pageWrap: { flex: 1, padding: 12 },
-  page: { flex: 1, borderRadius: 14, borderWidth: 1, overflow: 'hidden', maxWidth: 560, width: '100%', alignSelf: 'center' },
+  pageWrap: { flex: 1, padding: PAGE_PADDING, justifyContent: 'center' },
+  page: {
+    width: PAGE_WIDTH,
+    height: PAGE_HEIGHT,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+    transformOrigin: 'top left',
+  },
   error: { textAlign: 'center', paddingTop: 6, fontSize: 13 },
 });

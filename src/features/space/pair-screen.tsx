@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Palette, type PaletteColors } from '@/constants/theme';
+import { PillButton } from '@/components/pill-button';
+import { Palette } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 import { useSettingsStore } from '@/features/settings/settings-store';
-import { formatDay, parseIsoDate } from '@/lib/dates';
 
+import { CreateSpaceForm } from './create-space-form';
 import { useSpaceStore } from './space-store';
 
 /** Shown instead of the app until this phone is in a space. */
@@ -15,6 +16,8 @@ export function PairScreen() {
   const { status, error, pairCode, notice, init, createSpace, joinSpace, confirmCreated } = useSpaceStore();
   const startDate = useSettingsStore((state) => state.startDate);
   const [code, setCode] = useState('');
+  const [joinName, setJoinName] = useState('');
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const run = async (action: () => Promise<void>) => {
@@ -37,23 +40,34 @@ export function PairScreen() {
               {pairCode}
             </Text>
             {notice ? <Text style={{ color: colors.today, fontSize: 14 }}>{notice}</Text> : null}
-            <Button colors={colors} label={strings.pairContinue} onPress={confirmCreated} />
+            <PillButton colors={colors} label={strings.pairContinue} onPress={confirmCreated} />
           </>
         ) : status === 'error' ? (
           <>
             <Text accessibilityLiveRegion="polite" style={{ color: colors.today, fontSize: 15 }}>{error}</Text>
-            <Button colors={colors} label={strings.pairRetry} onPress={() => run(init)} disabled={busy} />
+            <PillButton colors={colors} label={strings.pairRetry} onPress={() => run(init)} disabled={busy} />
           </>
         ) : (
           <>
             <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.pairIntro}</Text>
 
-            <View style={[styles.card, { backgroundColor: colors.page, borderColor: colors.line }]}>
-              <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>{strings.pairCreateTitle}</Text>
-              <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.pairCreateHint(formatDay(parseIsoDate(startDate)))}</Text>
-              <Button colors={colors} label={busy ? strings.pairBusy : strings.pairCreateButton} onPress={() => run(() => createSpace(startDate))} disabled={busy} />
-            </View>
+            {creating ? (
+              <CreateSpaceForm
+                colors={colors}
+                initialStartDate={startDate}
+                busy={busy}
+                onSubmit={(setup, goals) => run(() => createSpace(setup, goals))}
+                onBack={() => setCreating(false)}
+              />
+            ) : (
+              <View style={[styles.card, { backgroundColor: colors.page, borderColor: colors.line }]}>
+                <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>{strings.pairCreateTitle}</Text>
+                <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.pairCreateHint}</Text>
+                <PillButton colors={colors} label={strings.pairCreateButton} onPress={() => setCreating(true)} />
+              </View>
+            )}
 
+            {creating ? null : (
             <View style={[styles.card, { backgroundColor: colors.page, borderColor: colors.line }]}>
               <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>{strings.pairJoinTitle}</Text>
               <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.pairJoinHint}</Text>
@@ -67,8 +81,23 @@ export function PairScreen() {
                 accessibilityLabel={strings.pairJoinPlaceholder}
                 style={[styles.input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.paper }]}
               />
-              <Button colors={colors} label={busy ? strings.pairBusy : strings.pairJoinButton} onPress={() => run(() => joinSpace(code))} disabled={busy || code.trim().length === 0} />
+              <TextInput
+                value={joinName}
+                onChangeText={setJoinName}
+                maxLength={40}
+                placeholder={strings.joinYourName}
+                placeholderTextColor={colors.inkSoft}
+                accessibilityLabel={strings.joinYourName}
+                style={[styles.input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.paper }]}
+              />
+              <PillButton
+                colors={colors}
+                label={busy ? strings.pairBusy : strings.pairJoinButton}
+                onPress={() => run(() => joinSpace(code, joinName))}
+                disabled={busy || code.trim().length === 0 || joinName.trim().length === 0}
+              />
             </View>
+            )}
 
             {error ? (
               <Text accessibilityLiveRegion="polite" style={{ color: colors.today, fontSize: 14 }}>
@@ -82,27 +111,6 @@ export function PairScreen() {
   );
 }
 
-interface ButtonProps {
-  colors: PaletteColors;
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-}
-
-function Button({ colors, label, onPress, disabled = false }: ButtonProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={[styles.button, { backgroundColor: colors.dotPast, opacity: disabled ? 0.5 : 1 }]}
-    >
-      <Text style={styles.buttonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { padding: 20, gap: 14, maxWidth: 520, width: '100%', alignSelf: 'center' },
@@ -112,6 +120,4 @@ const styles = StyleSheet.create({
   cardTitle: { fontFamily: 'Caveat_700Bold', fontSize: 30, lineHeight: 40 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
   code: { fontSize: 20, lineHeight: 30, textAlign: 'center', borderWidth: 1, borderRadius: 16, padding: 16, letterSpacing: 1, fontVariant: ['tabular-nums'] },
-  button: { minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

@@ -6,11 +6,13 @@ import { subscribeToTable } from '@/features/sync/realtime';
 import { stableJson } from '@/features/sync/stable-json';
 
 import { EMPTY_SNAPSHOT, fetchDay, pushDay, type DaySnapshot } from './day-cloud';
+import { baseOf, loadBase, mergeDay, saveBase, type DayBase } from './day-merge';
 import { loadDay, saveDay } from './storage';
 import type { CanvasItem } from './types';
 
 const SAVE_DELAY_MS = 400;
 const REFETCH_DELAY_MS = 250;
+const RETRY_DELAY_MS = 15_000;
 const OFFLINE_MESSAGE = 'No connection: showing the copy saved on this phone.';
 
 interface DayItems {
@@ -34,6 +36,18 @@ export function useDayItems(dayNumber: number): DayItems {
   const synced = useRef<DaySnapshot>(EMPTY_SNAPSHOT);
   const pushChain = useRef<Promise<void>>(Promise.resolve());
   const missedRemoteChange = useRef(false);
+  /** What the cloud had at the last sync. Anything on this phone that differs is a change not sent yet. */
+  const base = useRef<DayBase | null>(null);
+  const [needsRetry, setNeedsRetry] = useState(false);
+
+  const rememberBase = useCallback(
+    (cloudItems: readonly CanvasItem[]) => {
+      const next = baseOf(cloudItems);
+      base.current = next;
+      saveBase(dayNumber, next).catch(() => undefined);
+    },
+    [dayNumber],
+  );
 
   /** Sends local edits to the cloud, one push at a time. */
   const pushToCloud = useCallback(
@@ -41,22 +55,36 @@ export function useDayItems(dayNumber: number): DayItems {
       pushChain.current = pushChain.current
         .then(async () => {
           synced.current = await pushDay(spaceId, dayNumber, synced.current, toSend);
+          rememberBase(toSend);
+          setNeedsRetry(false);
           setError(null);
         })
-        .catch(() => setError('Saved on this phone, but not synced yet.'));
+        .catch(() => {
+          setNeedsRetry(true);
+          setError('Saved on this phone, will sync when you are online.');
+        });
       return pushChain.current;
     },
-    [dayNumber],
+    [dayNumber, rememberBase],
   );
 
-  /** Reads the page from the cloud and shows it if it differs from what is on screen. */
+  /**
+   * Reads the page from the cloud and puts this phone's unsent changes on top of it.
+   * Changes made offline are sent now instead of being overwritten.
+   */
   const pullFromCloud = useCallback(
     async (spaceId: string): Promise<void> => {
       const remote = await fetchDay(spaceId, dayNumber);
       synced.current = remote.snapshot;
-      if (stableJson(remote.items) !== stableJson(latestItems.current)) setItems(remote.items);
+      const local = latestItems.current;
+      const merged = base.current ? mergeDay(base.current, local, remote.items) : remote.items;
+      rememberBase(remote.items);
+      setNeedsRetry(false);
+      setError(null);
+      if (stableJson(merged) !== stableJson(local)) setItems(merged);
+      if (stableJson(merged) !== stableJson(remote.items)) await pushToCloud(spaceId, merged);
     },
-    [dayNumber],
+    [dayNumber, rememberBase, pushToCloud],
   );
 
   useEffect(() => {
@@ -64,18 +92,27 @@ export function useDayItems(dayNumber: number): DayItems {
     const spaceId = getSpaceId();
     loaded.current = false;
     synced.current = EMPTY_SNAPSHOT;
+    base.current = null;
     setCanEdit(false);
     (async () => {
-      const stored = await loadDay(dayNumber);
+      const [stored, storedBase] = await Promise.all([loadDay(dayNumber), loadBase(dayNumber).catch(() => null)]);
       if (cancelled) return;
       setItems(stored);
       latestItems.current = stored;
+      base.current = storedBase;
       if (spaceId) {
-        // Edits wait for the cloud copy, so an old local copy can never overwrite newer shared pages.
+        // Edits wait for the cloud copy; this phone's unsent changes are merged into it, never dropped.
         try {
           await pullFromCloud(spaceId);
         } catch {
-          if (!cancelled) setError(OFFLINE_MESSAGE);
+          if (cancelled) return;
+          setError(OFFLINE_MESSAGE);
+          setNeedsRetry(true);
+          // A page first opened offline: everything on it is new to the cloud.
+          if (base.current === null) {
+            base.current = {};
+            saveBase(dayNumber, {}).catch(() => undefined);
+          }
         }
         if (cancelled) return;
       }
@@ -119,6 +156,14 @@ export function useDayItems(dayNumber: number): DayItems {
     },
     [dayNumber, pushToCloud],
   );
+
+  // Offline edits: try again every few seconds until the cloud answers.
+  useEffect(() => {
+    const spaceId = getSpaceId();
+    if (!needsRetry || !spaceId) return undefined;
+    const timer = setInterval(() => pullFromCloud(spaceId).catch(() => undefined), RETRY_DELAY_MS);
+    return () => clearInterval(timer);
+  }, [needsRetry, pullFromCloud]);
 
   // Changes from the other phone arrive live; coming back to the app also refreshes the page.
   useEffect(() => {
