@@ -57,6 +57,22 @@ export async function deletePhoto(content: string): Promise<void> {
   await supabase.storage.from(BUCKET).remove([pathOf(content)]).catch(() => undefined);
 }
 
+/** Removes every photo file of a space (used when the last person leaves). Throws if the bucket cannot be read. */
+export async function deleteAllPhotos(spaceId: string): Promise<void> {
+  if (!supabase) return;
+  const bucket = supabase.storage.from(BUCKET);
+  // The space folder, and the sticker folder an earlier test build used.
+  for (const folder of [spaceId, `${spaceId}/stickers`]) {
+    const { data, error } = await bucket.list(folder, { limit: 1000 });
+    if (error) throw error;
+    const paths = (data ?? []).filter((entry) => entry.id !== null).map((entry) => `${folder}/${entry.name}`);
+    if (paths.length > 0) {
+      const removed = await bucket.remove(paths);
+      if (removed.error) throw removed.error;
+    }
+  }
+}
+
 interface CachedLink {
   url: string;
   expiresAt: number;
@@ -74,13 +90,18 @@ async function signedLink(path: string): Promise<string | null> {
   return data.signedUrl;
 }
 
+/** Synced items are untrusted data: an http(s) address in a photo would load from any server (a tracking pixel). */
+function isLocalUri(content: string): boolean {
+  return !/^https?:/i.test(content);
+}
+
 /** The address an image can load from: a local file as is, a cloud photo through a short-lived private link. */
 export function usePhotoUri(content: string): string | null {
-  const [uri, setUri] = useState<string | null>(isCloudPhoto(content) ? null : content);
+  const [uri, setUri] = useState<string | null>(isCloudPhoto(content) ? null : isLocalUri(content) ? content : null);
 
   useEffect(() => {
     if (!isCloudPhoto(content)) {
-      setUri(content);
+      setUri(isLocalUri(content) ? content : null);
       return undefined;
     }
     let cancelled = false;

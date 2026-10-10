@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/features/settings/settings-store';
 import { getSpaceId, setSpaceId } from '@/features/sync/context';
 import { supabase } from '@/lib/supabase';
 
+import { deleteAllPhotos } from '@/features/canvas/photo-cloud';
 import { insertGoal } from '@/features/goals/goals-cloud';
 import type { Goal } from '@/features/goals/types';
 
@@ -15,6 +16,8 @@ import {
   ensureSession,
   fetchMySpace,
   joinSpaceOnServer,
+  leaveSpaceOnServer,
+  removeMemberOnServer,
   rotatePairCodeOnServer,
   updateSpaceNameOnServer,
   type NewSpaceSetup,
@@ -45,6 +48,10 @@ interface SpaceState {
   confirmCreated: () => void;
   renameSpace: (name: string) => Promise<void>;
   newPairCode: () => Promise<void>;
+  /** Removes a member; the server makes a new code at the same time. */
+  removeMember: (userId: string) => Promise<void>;
+  /** `lastPerson`: this phone is the only member, so the space (and its photo files) goes away. */
+  leaveSpace: (lastPerson: boolean) => Promise<void>;
 }
 
 function readCache(raw: string | null): SpaceInfo | null {
@@ -63,6 +70,12 @@ async function fetchFreshSpace(): Promise<SpaceInfo | null | 'unreachable'> {
   } catch {
     return 'unreachable';
   }
+}
+
+async function storeNewCode(code: string): Promise<void> {
+  useSpaceStore.setState({ pairCode: code });
+  const cached = readCache(await AsyncStorage.getItem(CACHE_KEY));
+  if (cached) await remember({ ...cached, pairCode: code });
 }
 
 async function forgetSpace(): Promise<void> {
@@ -185,9 +198,18 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   },
 
   newPairCode: async () => {
-    const code = await rotatePairCodeOnServer();
-    set({ pairCode: code });
-    const cached = readCache(await AsyncStorage.getItem(CACHE_KEY));
-    if (cached) await remember({ ...cached, pairCode: code });
+    await storeNewCode(await rotatePairCodeOnServer());
+  },
+
+  removeMember: async (userId) => {
+    await storeNewCode(await removeMemberOnServer(userId));
+  },
+
+  leaveSpace: async (lastPerson) => {
+    const spaceId = getSpaceId();
+    if (lastPerson && spaceId) await deleteAllPhotos(spaceId);
+    await leaveSpaceOnServer();
+    await forgetSpace();
+    set({ status: 'pairing', spaceName: DEFAULT_SPACE_NAME, pairCode: null, notice: null, error: null });
   },
 }));

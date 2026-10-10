@@ -1,8 +1,8 @@
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Palette } from '@/constants/theme';
+import { useColors } from '@/lib/use-theme';
 import { strings } from '@/constants/strings';
 import { formatAmount } from '@/features/goals/command';
 import { useGoalsStore } from '@/features/goals/goals-store';
@@ -12,7 +12,7 @@ import { loadGoalEntries, progressFor, totalFor } from '@/features/goals/progres
 import type { GoalEntry } from '@/features/goals/types';
 
 export default function GoalsScreen() {
-  const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const colors = useColors();
   const router = useRouter();
   const { goals, load, addGoal } = useGoalsStore();
   const [entries, setEntries] = useState<GoalEntry[]>([]);

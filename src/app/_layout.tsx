@@ -2,7 +2,6 @@ import { Caveat_700Bold, useFonts } from '@expo-google-fonts/caveat';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 
 import { Palette } from '@/constants/theme';
 import { useGoalsStore } from '@/features/goals/goals-store';
@@ -10,9 +9,10 @@ import { PairScreen } from '@/features/space/pair-screen';
 import { useSpaceStore } from '@/features/space/space-store';
 import { useSettingsStore } from '@/features/settings/settings-store';
 import { subscribeToTable } from '@/features/sync/realtime';
+import { useScheme } from '@/lib/use-theme';
 
 export default function RootLayout() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
   const colors = Palette[scheme];
   const [fontsLoaded] = useFonts({ Caveat_700Bold });
 

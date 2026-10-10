@@ -5,7 +5,9 @@ Last updated: 2026-10-11. Written by the builder session.
 Repo: https://github.com/DieWahrePalme/OurLife (public, remote `origin` via SSH).
 Live web version: https://diewahrepalme.github.io/OurLife/ (GitHub Pages, rebuilt on every push to `main`).
 
-**The work of 2026-10-11 is committed locally (not pushed yet; pushing to `main` rebuilds the web version).**
+**Committed locally (not pushed; pushing to `main` rebuilds the web version): the work of 2026-10-11 up to the commit
+"feat: space setup, members as admins, offline merge, KLIPY ...".** After that commit, still **uncommitted**: security
+hardening (migration 004), leave space, appearance setting, toolbar height fix, photo address allow-list.
 It changes the database too: see "SQL to run" below.
 
 ## What works today
@@ -16,10 +18,13 @@ Runs in Expo Go, in a browser and on GitHub Pages. Phones share one space and sy
   optional goals. Gets a 24-character code. Name, code and people are managed in Settings.
 - **Joining**: enter the code and your own name. Up to **20 people** per space (DB cap, was 2).
 - **Everyone is an admin**: any member can remove any other member (not themself) and can make a
-  **new code** (the old one stops working; people already in stay). A removed phone lands on the
+  **new code** (the old one stops working; people already in stay). **Removing someone automatically makes a
+  new code**, so the removed person cannot come back with the old one. A removed phone lands on the
   pairing screen at its next app start ("You were removed from your space").
   Lost phone: join from the new phone with the code, remove the old entry in Settings.
-  If the old phone could be in wrong hands, also make a new code.
+- **Leave space** (Settings): this phone leaves, the others keep everything. When the last person leaves, the space
+  with its pages, goals and photo files is deleted (the app deletes the photo files first).
+- **Appearance** (Settings, per phone): System / Light / Dark, `src/lib/use-theme.ts` (`useColors`, `useScheme`).
 - **Home**: "Day N" counter, space name above "together since …", 7-column dot grid, month labels,
   today in orange, 3 future weeks as outlines. Light (cream) and dark follow the phone.
 - **Day page** (tap any dot): a white page with the **same logical size (360 x 580) on every device**,
@@ -48,6 +53,7 @@ Local cache keys: `ourlife.day.<n>`, `ourlife.base.<n>`, `ourlife.goals`, `ourli
 | `supabase/schema.sql` | full schema for a fresh project (already includes everything below) |
 | `supabase/migration-002-members.sql` | names, 20 members, `remove_member`, `rotate_pair_code`: **run by Moritz on 2026-10-11** |
 | `supabase/migration-003-gif-photos.sql` | allows `image/gif` in the photo bucket: **prepared, ask Moritz whether it was run** (own GIFs fail without it) |
+| `supabase/migration-004-hardening.sql` | rate limiter, size caps, `remove_member` returns a new code, `leave_space()`, input checks, narrower rights, storage policies `to authenticated`: **prepared 2026-10-11, not run yet**. Run it after 002 and 003; the app code already expects it (remove / leave would fail before) |
 
 ## How it is wired (Supabase)
 
@@ -70,6 +76,28 @@ Local cache keys: `ourlife.day.<n>`, `ourlife.base.<n>`, `ourlife.goals`, `ourli
   Failed pushes retry every 15 s and on app focus / realtime events.
   Goals: failed adds / deletes are queued in `ourlife.goals.pending` and sent on the next load.
 - `forgetSpace` / `clearLocalData` (leaving or being removed) also clear the base and pending keys.
+
+## Rate limiter and caps (migration 004)
+
+Meant so that normal use is never noticed and abuse is slow. Counted per person in `public.rate_events`
+(`rate_check`, only callable from inside the database functions):
+
+| What | Per minute | Per hour |
+| --- | --- | --- |
+| item writes (insert + update count) | 300 | 3000 |
+| goal writes | 30 | 300 |
+| photo uploads | 10 | 60 |
+| create a space (per person / all people together) | 2 / 10 | 5 / 60 |
+| join attempts (code guessing) | 10 | 30 |
+| remove, new code, leave | 10 | 60 |
+
+Caps per space: 5000 items, 200 goals, 400 photos, 20 people. Hitting a limit gives "Too many requests …"; the app
+keeps the change on the phone and retries (15 s), so a normal user just sees a delay. An upsert of an existing row
+counts twice (insert and update trigger), which is fine for normal use. Anonymous sign-ups themselves are not
+limited by the database: for that keep Supabase's Authentication rate limits low and consider CAPTCHA before TestFlight.
+**Tested** with a local Postgres (PGlite) against the full `schema.sql`: 48 scenarios (join / wrong code, removal and
+rejoin, leave, every limit and cap, rights, anon access, second run of the migration). The test script lives
+only in the session scratchpad, it is not in the repo (no test suite yet).
 
 ## KLIPY (sticker + GIF library)
 
@@ -110,7 +138,10 @@ The merge function itself was tested with five cases (local edit / delete / add,
 ## What is next
 
 1. **Test the above on the phones**, then commit (Moritz asks for it).
-2. **Security review of migration 002** (`remove_member`, `rotate_pair_code`, `create_space`,
+2. ~~Security review of migration 002~~ done 2026-10-11, no critical / high findings; the findings were applied in
+   migration 004 (rate limits and caps, race on mutual removal, `join_space` errors, input checks, narrower rights,
+   storage policies). Not done: CAPTCHA on anonymous sign-in, an owner role (all members are equal admins by decision),
+   data export / full account deletion. Original note: **Security review of migration 002** (`remove_member`, `rotate_pair_code`, `create_space`,
    `join_space`, 20-member cap) and of the sync code. Not done: reviews on file are only from
    2026-10-06 (old schema, `src/`).
 3. **GitHub variable** `EXPO_PUBLIC_KLIPY_KEY` for the Pages build; KLIPY logo instead of the text mark.

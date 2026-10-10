@@ -113,8 +113,16 @@ export async function renameMemberOnServer(userId: string, nickname: string): Pr
   if (error) throw error;
 }
 
-export async function removeMemberOnServer(userId: string): Promise<void> {
-  const { error } = await client().rpc('remove_member', { target_user: userId });
+/** Removes the member. The server makes a new pairing code at the same time and returns it. */
+export async function removeMemberOnServer(userId: string): Promise<string> {
+  const { data, error } = await client().rpc('remove_member', { target_user: userId });
+  if (error) throw error;
+  if (typeof data !== 'string') throw new Error('Unexpected answer from the server');
+  return data;
+}
+
+export async function leaveSpaceOnServer(): Promise<void> {
+  const { error } = await client().rpc('leave_space');
   if (error) throw error;
 }
 

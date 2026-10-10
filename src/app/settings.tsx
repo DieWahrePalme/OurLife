@@ -1,16 +1,22 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Palette } from '@/constants/theme';
+import { useColors } from '@/lib/use-theme';
 import { strings } from '@/constants/strings';
 import { PEN_COLORS } from '@/features/canvas/types';
 import { SpaceSection } from '@/features/space/space-section';
 import { useSpaceStore } from '@/features/space/space-store';
-import { isValidStartDate, useSettingsStore } from '@/features/settings/settings-store';
+import { APPEARANCES, isValidStartDate, useSettingsStore, type Appearance } from '@/features/settings/settings-store';
+
+const APPEARANCE_LABEL: Readonly<Record<Appearance, string>> = {
+  system: strings.appearanceSystem,
+  light: strings.appearanceLight,
+  dark: strings.appearanceDark,
+};
 
 export default function SettingsScreen() {
-  const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
-  const { penColor, startDate, update } = useSettingsStore();
+  const colors = useColors();
+  const { penColor, startDate, appearance, update } = useSettingsStore();
   const inSpace = useSpaceStore((state) => state.status === 'ready');
   const [draftDate, setDraftDate] = useState(startDate);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
@@ -26,7 +32,23 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>{strings.settingsColorTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>{strings.settingsAppearanceTitle}</Text>
+      <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsAppearanceHint}</Text>
+      <View style={styles.segments} accessibilityRole="radiogroup">
+        {APPEARANCES.map((option) => (
+          <Pressable
+            key={option}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: option === appearance }}
+            onPress={() => update({ appearance: option })}
+            style={[styles.segment, { borderColor: colors.line, backgroundColor: option === appearance ? colors.dotPast : colors.page }]}
+          >
+            <Text style={{ color: option === appearance ? '#fff' : colors.ink, fontWeight: '600' }}>{APPEARANCE_LABEL[option]}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsColorTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsColorHint}</Text>
       <View style={styles.swatches}>
         {PEN_COLORS.map((color) => (
@@ -74,6 +96,8 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Caveat_700Bold', fontSize: 30, lineHeight: 42 },
   spaced: { marginTop: 24 },
   hint: { fontSize: 14 },
+  segments: { flexDirection: 'row', gap: 8 },
+  segment: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   swatches: { flexDirection: 'row', flexWrap: 'wrap' },
   swatchHit: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2 },

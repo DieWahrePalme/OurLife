@@ -29,6 +29,9 @@ marked "new" below) is committed locally, not pushed, and has not been tried on 
 | Up to 20 people per space, every member is an admin (remove people, new code) | new, needs `migration-002` (run) |
 | Lost phone: join again from the new one, remove the old entry | new |
 | Offline edits are kept and sent later (days and goals) | new |
+| Leave space; removing a member makes a new code | new, needs `migration-004` |
+| Rate limiter and size caps against abuse | new, needs `migration-004` |
+| Appearance: system / light / dark (per phone) | new |
 | Sticker + GIF library from KLIPY (search, trending), own GIFs as photos | new, needs a KLIPY key and `migration-003` |
 | Live sync of days, goals and start date between phones | done |
 | Photos in the private cloud bucket | done |

@@ -1,8 +1,8 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Palette } from '@/constants/theme';
+import { useColors } from '@/lib/use-theme';
 import { strings } from '@/constants/strings';
 import { formatAmount } from '@/features/goals/command';
 import { useSettingsStore } from '@/features/settings/settings-store';
@@ -13,7 +13,7 @@ import type { GoalEntry } from '@/features/goals/types';
 import { dateForDayNumber, formatDay, parseIsoDate } from '@/lib/dates';
 
 export default function GoalDetailScreen() {
-  const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const colors = useColors();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const startDate = useSettingsStore((state) => state.startDate);

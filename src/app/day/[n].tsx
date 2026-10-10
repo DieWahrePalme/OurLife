@@ -1,7 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Palette } from '@/constants/theme';
+import { useColors } from '@/lib/use-theme';
 import { strings } from '@/constants/strings';
 import { useSettingsStore } from '@/features/settings/settings-store';
 import { DayCanvas } from '@/features/canvas/day-canvas';
@@ -9,7 +9,7 @@ import { dateForDayNumber, formatDay, parseIsoDate } from '@/lib/dates';
 
 export default function DayScreen() {
   const startDate = useSettingsStore((state) => state.startDate);
-  const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const colors = useColors();
   const { n } = useLocalSearchParams<{ n: string }>();
   const dayNumber = Number.parseInt(n ?? '', 10);
 

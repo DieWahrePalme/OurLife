@@ -6,7 +6,7 @@ import { strings } from '@/constants/strings';
 import type { PaletteColors } from '@/constants/theme';
 import { getSpaceId } from '@/features/sync/context';
 
-import { ensureSession, fetchMembers, removeMemberOnServer, renameMemberOnServer, type Member } from './space-api';
+import { ensureSession, fetchMembers, renameMemberOnServer, type Member } from './space-api';
 import { useSpaceStore } from './space-store';
 
 interface SpaceSectionProps {
@@ -15,7 +15,7 @@ interface SpaceSectionProps {
 
 /** Settings block: space name, pairing code, and the people in the space (everyone is an admin). */
 export function SpaceSection({ colors }: SpaceSectionProps) {
-  const { spaceName, pairCode, renameSpace, newPairCode } = useSpaceStore();
+  const { spaceName, pairCode, renameSpace, newPairCode, removeMember, leaveSpace } = useSpaceStore();
   const [nameDraft, setNameDraft] = useState(spaceName);
   const [members, setMembers] = useState<readonly Member[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
     if (armed !== member.userId) return setArmed(member.userId);
     setArmed(null);
     attempt(async () => {
-      await removeMemberOnServer(member.userId);
+      await removeMember(member.userId);
       await loadMembers();
     });
   };
@@ -119,6 +119,22 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
           await renameMemberOnServer(myId, myNameDraft.trim());
           await loadMembers();
         }, 'Saved.')}
+      />
+
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsLeaveTitle}</Text>
+      <Text style={[styles.hint, { color: colors.inkSoft }]}>
+        {members.length === 1 ? strings.settingsLeaveHintLast : strings.settingsLeaveHint}
+      </Text>
+      <PillButton
+        colors={colors}
+        label={armed === 'leave' ? strings.settingsMemberRemoveConfirm : strings.settingsLeave}
+        disabled={myId === null || members.length === 0}
+        onPress={() => {
+          if (armed !== 'leave') return setArmed('leave');
+          setArmed(null);
+          // Only a loaded list with exactly this phone in it counts as "the last person".
+          attempt(() => leaveSpace(members.length === 1));
+        }}
       />
 
       {message ? (

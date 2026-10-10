@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PillButton } from '@/components/pill-button';
-import { Palette } from '@/constants/theme';
+import { useColors } from '@/lib/use-theme';
 import { strings } from '@/constants/strings';
 import { useSettingsStore } from '@/features/settings/settings-store';
 
@@ -12,7 +12,7 @@ import { useSpaceStore } from './space-store';
 
 /** Shown instead of the app until this phone is in a space. */
 export function PairScreen() {
-  const colors = Palette[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  const colors = useColors();
   const { status, error, pairCode, notice, init, createSpace, joinSpace, confirmCreated } = useSpaceStore();
   const startDate = useSettingsStore((state) => state.startDate);
   const [code, setCode] = useState('');
