@@ -37,9 +37,11 @@ marked "new" below) is committed locally, not pushed, and has not been tried on 
 | Photos in the private cloud bucket | done |
 | Web version on GitHub Pages | done (rebuilt on every push to `main`) |
 | Offline start date change and offline photo upload | not built |
+| Skins for the day list (floral, retro, anime, ...) | idea, not started |
+| Long-press a day on Home for a quick preview | idea, not started |
 | Native iOS build (EAS / TestFlight) | not started |
 
-Next steps, open questions and known small things: `docs/HANDOFF.md`.
+Next steps, open questions and known small things: `docs/HANDOFF.md` (start there).
 Product description: `docs/PRD.md`.
 
 ## Run it

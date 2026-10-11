@@ -1,14 +1,15 @@
 # OurLife: handoff
 
-Last updated: 2026-10-11. Written by the builder session.
+Last updated: 2026-10-11 (end of the day). Written by the builder session.
+
+**Start here next time:** read "What works today", "What is next" and "Not checked on a phone yet" below.
+Moritz decides what comes next; ideas he gave but that are not built yet are at the top of "What is next".
 
 Repo: https://github.com/DieWahrePalme/OurLife (public, remote `origin` via SSH).
 Live web version: https://diewahrepalme.github.io/OurLife/ (GitHub Pages, rebuilt on every push to `main`).
 
-**Committed locally (not pushed; pushing to `main` rebuilds the web version): the work of 2026-10-11 up to the commit
-"feat: space setup, members as admins, offline merge, KLIPY ...".** After that commit, still **uncommitted**: security
-hardening (migration 004), leave space, appearance setting, toolbar height fix, photo address allow-list.
-It changes the database too: see "SQL to run" below.
+**State: the code is committed and pushed (code up to the commit "ci: Node 24, Ubuntu 26.04 ..."); the docs-only commit
+of the evening may still be local, check `git status` / `git log origin/main..`.** The web version on GitHub Pages is built from the pushed code. The database has migrations 002, 003 and 004 (checked with the verify query, 40 of 40 ok).
 
 ## What works today
 
@@ -52,8 +53,9 @@ Local cache keys: `ourlife.day.<n>`, `ourlife.base.<n>`, `ourlife.goals`, `ourli
 | --- | --- |
 | `supabase/schema.sql` | full schema for a fresh project (already includes everything below) |
 | `supabase/migration-002-members.sql` | names, 20 members, `remove_member`, `rotate_pair_code`: **run by Moritz on 2026-10-11** |
-| `supabase/migration-003-gif-photos.sql` | allows `image/gif` in the photo bucket: **prepared, ask Moritz whether it was run** (own GIFs fail without it) |
-| `supabase/migration-004-hardening.sql` | rate limiter, size caps, `remove_member` returns a new code, `leave_space()`, input checks, narrower rights, storage policies `to authenticated`: **prepared 2026-10-11, not run yet**. Run it after 002 and 003; the app code already expects it (remove / leave would fail before) |
+| `supabase/migration-003-gif-photos.sql` | allows `image/gif` in the photo bucket: **run by Moritz on 2026-10-11** |
+| `supabase/verify-live.sql` | read-only check of the live database (40 lines, every `ok` must be `true`); run it in the SQL editor after every migration |
+| `supabase/migration-004-hardening.sql` | rate limiter, size caps, `remove_member` returns a new code, `leave_space()`, input checks, narrower rights, storage policies `to authenticated`: **run by Moritz on 2026-10-11**; the app code expects it (remove / leave need it) |
 
 ## How it is wired (Supabase)
 
@@ -96,8 +98,8 @@ keeps the change on the phone and retries (15 s), so a normal user just sees a d
 counts twice (insert and update trigger), which is fine for normal use. Anonymous sign-ups themselves are not
 limited by the database: for that keep Supabase's Authentication rate limits low and consider CAPTCHA before TestFlight.
 **Tested** with a local Postgres (PGlite) against the full `schema.sql`: 48 scenarios (join / wrong code, removal and
-rejoin, leave, every limit and cap, rights, anon access, second run of the migration). The test script lives
-only in the session scratchpad, it is not in the repo (no test suite yet).
+rejoin, leave, every limit and cap, rights, anon access, second run of the migration). The 48-scenario script was
+only in the session scratchpad and is gone; `supabase/verify-live.sql` is kept in the repo.
 
 ## KLIPY (sticker + GIF library)
 
@@ -127,32 +129,58 @@ only in the session scratchpad, it is not in the repo (no test suite yet).
 - Type check: `npx tsc --noEmit`. Lint: `npx expo lint`
 - Web export test for Pages: `GH_PAGES_BASE_PATH=/OurLife npx expo export --platform web`
 
-## Not checked on a phone yet
+## What was checked
 
-Written and type-checked, but not tried on a real device: the new setup form with goals, removing a
-member and the "removed" screen, new code, the offline merge, the library tabs (search, scroll, placing
-a GIF), uploading an own GIF. The offline test: airplane mode, edit a day, app closed, airplane mode
-off, reopen; the edits must still be there and show on the other phone.
-The merge function itself was tested with five cases (local edit / delete / add, remote edit / delete / add).
+- **On Moritz's phone (2026-10-11, "looks good")**: setup form, members, removing, leave, offline, the library tabs,
+  appearance, page size, toolbar. He did not report anything open afterwards.
+- **By the builder**: type check (`npx tsc --noEmit`), the offline merge function (5 cases), the KLIPY parser (sample
+  response in the documented format, live API with curl), the SQL against a local Postgres (PGlite, 48 scenarios, full
+  `schema.sql` plus a second run of migration 004), the live database with the verify query (40 of 40 ok),
+  a local web export and the GitHub Pages deploy (success).
+- **Not checked**: the web version in a browser by a person after the deploy; the app with three or more people;
+  Android; screen readers (VoiceOver) on the new screens.
 
 ## What is next
 
-1. **Test the above on the phones**, then commit (Moritz asks for it).
-2. ~~Security review of migration 002~~ done 2026-10-11, no critical / high findings; the findings were applied in
-   migration 004 (rate limits and caps, race on mutual removal, `join_space` errors, input checks, narrower rights,
-   storage policies). Not done: CAPTCHA on anonymous sign-in, an owner role (all members are equal admins by decision),
-   data export / full account deletion. Original note: **Security review of migration 002** (`remove_member`, `rotate_pair_code`, `create_space`,
-   `join_space`, 20-member cap) and of the sync code. Not done: reviews on file are only from
-   2026-10-06 (old schema, `src/`).
-3. **GitHub variable** `EXPO_PUBLIC_KLIPY_KEY` for the Pages build; KLIPY logo instead of the text mark.
-4. **Offline gaps**: a start date changed while offline is not sent later (cloud wins at next start);
+Ideas from Moritz (2026-10-11), not started:
+
+1. **Skins (themes) for the day list.** Several base designs for the Home screen, picked in Settings: the simple one
+   as today, playful / floral, retro, anime, and more later. A skin changes the background, the dots (shape, colours,
+   today marker), the fonts and the colours; it should not change how a day page works. Notes for when it is built:
+   - Make the look data, not code: one skin = a small object (colours for light and dark, dot style, font names,
+     background) next to `src/constants/theme.ts`; screens read it through `useColors()` / a new `useSkin()`
+     (see `src/lib/use-theme.ts`, which already hides light / dark / system).
+   - **Decided: a skin is per phone** (like Appearance), stored in `ourlife.settings`; the other phone's skin does not
+     affect yours. Which look comes first is still open.
+   - Art and fonts must be original or properly licensed: nothing from `design-refs/`, and for "anime" no characters
+     or copied styles of existing series; draw the look with shapes, gradients and free fonts (check each licence).
+   - Fonts come from `@expo-google-fonts/*` (Caveat is the only one loaded now); check load time on the web build.
+   - Keep dark mode working for every skin and keep touch targets and contrast (accessibility rules).
+2. **Long-press a day on the Home grid for a quick look.** Instead of opening the day, a long press shows a short
+   preview of that day's page on top of the Home screen (no navigation); letting go closes it, a normal tap still
+   opens the day. Notes for when it is built:
+   - The preview is the same page, read-only, scaled down (reuse the 360 x 580 logical page and its scale logic in
+     `day-canvas.tsx`; items come from the local copy `ourlife.day.<n>`, optionally refreshed from the cloud).
+   - Empty days show a short "nothing here yet" instead of a blank page. Photos and library stickers load as usual.
+   - **Decided: look only.** Letting go closes the preview; a short tap on the day opens it, as today. No jump button.
+   - Needs a long-press handler on the dots in `src/components/day-grid.tsx` (check it does not clash with scrolling),
+     an accessibility action ("Show preview") and a haptic tick.
+
+Older items:
+
+3. **Offline gaps**: a start date changed while offline is not sent later (cloud wins at next start);
    a photo added offline is not uploaded later (the item keeps a local file path).
-5. **Handwriting fonts**: only Caveat so far; the refs use several journal fonts.
-6. **Throwback books**, reminders, export (see PRD section 4).
-7. **Smaller dots** option for the grid. Moritz has not asked again.
-8. **Native iOS build / EAS** (TestFlight) when the friends MVP starts. Not configured yet.
+4. **Anonymous sign-up spam**: keep Supabase's Authentication rate limits low (dashboard) and consider CAPTCHA before
+   TestFlight; the database limiter (migration 004) cannot stop account creation itself.
+5. **KLIPY logo** instead of the text mark "Powered by KLIPY"; Production key when more people use the app.
+6. **Handwriting fonts**: only Caveat so far; the refs use several journal fonts (fits together with skins).
+7. **Throwback books**, reminders, export / full account deletion (see PRD section 4).
+8. **Smaller dots** option for the grid (fits together with skins).
+9. **Native iOS build / EAS** (TestFlight) when the friends MVP starts. Not configured yet.
    Needs the KLIPY Production key, `expo-secure-store` for the session token, and an own-phone test.
-9. Tests: none yet. Add only if Moritz asks.
+10. Housekeeping: `expo lint` reports 4 `set-state-in-effect` errors (see below); `eslint` 9 and `uuid` 7 show
+    deprecation warnings in `npm ci`.
+11. Tests: none yet. Add only if Moritz asks.
 
 ## Known small things
 
@@ -179,9 +207,8 @@ The merge function itself was tested with five cases (local edit / delete / add,
 
 ## Open questions for Moritz
 
-1. Was migration 003 (GIF in photos) run?
-2. KLIPY Production key / logo: when more people than the two of them use the app.
-3. When does the iOS / TestFlight build start?
+1. Skins: which look first (playful / floral, retro, anime)?
+2. When does the iOS / TestFlight build start?
 
 ## Decisions already made
 
@@ -190,7 +217,7 @@ author tracking (colours tell who wrote what); goals driven by typed commands;
 milestone countdown on Home removed (it did not feel cosy); anonymous sign-in, no email accounts;
 joined with a long random code. **2026-10-11:** every member is an admin (can remove people and make
 a new code), member limit 20 instead of 2; space has a name and members have names; the page has a
-fixed logical size; no own sticker collection (own GIFs and pictures go in as photos), the big
+fixed logical size; skins (later) are per phone; the long-press preview (later) is look-only; no own sticker collection (own GIFs and pictures go in as photos), the big
 library is KLIPY.
 
 ## Things to know
