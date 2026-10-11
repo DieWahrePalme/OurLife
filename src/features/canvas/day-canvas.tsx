@@ -11,6 +11,7 @@ import { TextModal } from './text-modal';
 import { Toolbar } from './toolbar';
 import { UndoBar } from './undo-bar';
 import { useDayItems } from './use-day-items';
+import { usePhotoResync } from './use-photo-resync';
 import { useUndoDelete } from './use-undo-delete';
 import { PEN_COLORS, type CanvasItem, type Task } from './types';
 import type { PaletteColors } from '@/constants/theme';
@@ -66,6 +67,7 @@ function newId(): string {
 export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const { items, canEdit, error, add, update, remove, restore, bringToFront } = useDayItems(dayNumber);
   const { deleted, deleteItem, undo } = useUndoDelete(items, remove, restore);
+  usePhotoResync(items, canEdit, update);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const lastSelectAt = useRef(0);
   const [available, setAvailable] = useState({ width: 0, height: 0 });

@@ -32,6 +32,10 @@ function pathOf(content: string): string {
   return content.slice(REF_PREFIX.length);
 }
 
+function isAlreadyThere(error: { message?: string; statusCode?: string }): boolean {
+  return error.statusCode === '409' || /already exists/i.test(error.message ?? '');
+}
+
 /** Uploads a local image to `path` in the private bucket. Returns the reference to store in an item. */
 export async function uploadImage(path: string, localUri: string): Promise<string> {
   if (!supabase) throw new Error('Cloud is not configured');
@@ -39,7 +43,8 @@ export async function uploadImage(path: string, localUri: string): Promise<strin
   if (!EXTENSION_BY_TYPE[blob.type]) throw new Error('This image type is not supported');
   if (blob.size > MAX_BYTES) throw new Error('This image is too large (10 MB at most)');
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, upsert: false });
-  if (error) throw error;
+  // The same item uploaded before (an earlier try got through, the answer was lost): the file is already there.
+  if (error && !isAlreadyThere(error)) throw error;
   return cloudRef(path);
 }
 
