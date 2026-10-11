@@ -1,6 +1,6 @@
 # OurLife: handoff
 
-Last updated: 2026-10-11 (end of the day). Written by the builder session.
+Last updated: 2026-10-12 (end of the day). Written by the builder session.
 
 **Start here next time:** read "What works today", "What is next" and "Not checked on a phone yet" below.
 Moritz decides what comes next; ideas he gave but that are not built yet are at the top of "What is next".
@@ -8,8 +8,12 @@ Moritz decides what comes next; ideas he gave but that are not built yet are at 
 Repo: https://github.com/DieWahrePalme/OurLife (public, remote `origin` via SSH).
 Live web version: https://diewahrepalme.github.io/OurLife/ (GitHub Pages, rebuilt on every push to `main`).
 
-**State: the code is committed and pushed (code up to the commit "ci: Node 24, Ubuntu 26.04 ..."); the docs-only commit
-of the evening may still be local, check `git status` / `git log origin/main..`.** The web version on GitHub Pages is built from the pushed code. The database has migrations 002, 003 and 004 (checked with the verify query, 40 of 40 ok).
+**State: everything is committed and pushed (last code commit `4177a4e`, skins + paste sticker). The Pages deploy of that
+commit was still running when this was written, check `gh run list --limit 1`.** The database has migrations 002, 003 and
+004 (checked with the verify query, 40 of 40 ok). No new SQL since then.
+
+**Checked on phones (2026-10-12, Moritz):** the skins look good, the paste-sticker button works, and the app now also loads on
+his girlfriend's phone. Still open from the skin review: pattern strength / more skins (see "What is next").
 
 ## What works today
 
@@ -26,6 +30,15 @@ Runs in Expo Go, in a browser and on GitHub Pages. Phones share one space and sy
 - **Leave space** (Settings): this phone leaves, the others keep everything. When the last person leaves, the space
   with its pages, goals and photo files is deleted (the app deletes the photo files first).
 - **Appearance** (Settings, per phone): System / Light / Dark, `src/lib/use-theme.ts` (`useColors`, `useScheme`).
+- **Skins** (Settings > Look, per phone, key `skin` in `ourlife.settings`): Original (follows light / dark), **Scrapbook**
+  (mint paper, pink flowers, Kalam font) and **Luxury** (near-black, gold lattice, Cormorant Garamond). A skin is data in
+  `src/constants/skins.ts` (palette + `pattern` + `fontDisplay` + `followsAppearance`); `useSkin()` / `useColors()` in
+  `src/lib/use-theme.ts`; backdrop drawn by `src/components/skin-background.tsx` (react-native-svg patterns, original shapes);
+  `SkinFrame` + a transparent `ThemeProvider` in `src/app/_layout.tsx` so the pattern shows through the stack. Scrapbook and
+  Luxury have fixed colours (the Light / Dark choice is hidden with a hint). Titles use `colors.fontDisplay`; **notes on the
+  day page stay Caveat in every skin** and the page itself (`colors.sheet`) stays light so pen colours stay readable.
+  Contrast of all palettes was computed (4.5:1 text, 3:1 graphics). Add a skin = one object in `skins.ts` + a preview
+  in `skin-picker.tsx`; load its font in `_layout.tsx`.
 - **Home**: "Day N" counter, space name above "together since …", 7-column dot grid, month labels,
   today in orange, 3 future weeks as outlines. Light (cream) and dark follow the phone.
 - **Day page** (tap any dot): a white page with the **same logical size (360 x 580) on every device**,
@@ -36,8 +49,19 @@ Runs in Expo Go, in a browser and on GitHub Pages. Phones share one space and sy
 - **Stickers**: the sticker sheet (a plain overlay, not a `Modal`) has tabs **Stickers / GIFs / Emoji**.
   Stickers and GIFs come from the **KLIPY** library (search + trending, endless scroll). Emoji tab is
   the old built-in set. **Own GIFs and pictures** are added as photos (photo button).
+- **Paste a sticker** (sticker sheet, button "Paste from clipboard"): takes the image on the clipboard (on iOS: long-press a
+  subject in Photos > Copy, a transparent PNG), saves it in the app folder (`photos.ts` `pasteClipboardImage`, package
+  `expo-clipboard`), shows it as a frameless `sticker` item and uploads it like a photo (content `storage:<path>`).
+  Rendering is `PastedSticker` in `item-content.tsx`; resync and delete treat it like a photo.
+- **Day grid** (since 2026-10-12): filled days are solid dots, a small inner dot shows the mood colour, empty past days are a
+  soft tinted disc, future days a thin ring, milestones show "100" / "1y" (calendar anniversaries, so 12.10. = day 366,
+  `src/lib/milestones.ts`), a "Today" button jumps to today. Summaries come from `day-summary*.ts` (local + cloud).
+- **Day page extras**: icon toolbar (raised by `BAR_LIFT`), prev / next day arrows, an empty-page hint, **Undo after delete**
+  (6 s bar, the photo file is only deleted after the window; `use-undo-delete.ts`, `undo-bar.tsx`).
 - **Photos**: private Supabase bucket `photos` (`<space_id>/<item_id>.<ext>`), short-lived signed links.
   Deleting a photo item deletes the file. GIF is allowed after migration 003.
+  **Self-healing (2026-10-12):** a photo or pasted sticker that only exists as a local file (upload failed, phone offline) is
+  uploaded again when the day page opens (`use-photo-resync.ts`); "already exists" from storage counts as success.
 - **Goals**: create a goal (also during space setup); on a day page type `/goal car +50`. Totals come
   from the chips. Goals sync between phones.
 - **Settings**: default colour (per phone), start date (shared), space name, pairing code + "Make a new
@@ -144,18 +168,13 @@ only in the session scratchpad and is gone; `supabase/verify-live.sql` is kept i
 
 Ideas from Moritz (2026-10-11), not started:
 
-1. **Skins (themes) for the day list.** Several base designs for the Home screen, picked in Settings: the simple one
-   as today, playful / floral, retro, anime, and more later. A skin changes the background, the dots (shape, colours,
-   today marker), the fonts and the colours; it should not change how a day page works. Notes for when it is built:
-   - Make the look data, not code: one skin = a small object (colours for light and dark, dot style, font names,
-     background) next to `src/constants/theme.ts`; screens read it through `useColors()` / a new `useSkin()`
-     (see `src/lib/use-theme.ts`, which already hides light / dark / system).
-   - **Decided: a skin is per phone** (like Appearance), stored in `ourlife.settings`; the other phone's skin does not
-     affect yours. Which look comes first is still open.
-   - Art and fonts must be original or properly licensed: nothing from `design-refs/`, and for "anime" no characters
-     or copied styles of existing series; draw the look with shapes, gradients and free fonts (check each licence).
-   - Fonts come from `@expo-google-fonts/*` (Caveat is the only one loaded now); check load time on the web build.
-   - Keep dark mode working for every skin and keep touch targets and contrast (accessibility rules).
+1. **Skins: more looks?** Moritz said the three skins are good and paste works (2026-10-12). Possible additions: more skins he may want: retro, anime (original art only), a floral /
+   romantic one, a light luxury variant; real paper textures would need own or licensed images (references in `design-refs/`
+   must not be copied, the gold Medusa / paisley motifs are brand material).
+   Rules that stay: skins are per phone, change only background / colours / title font, never layout or logic.
+1b. **Rest of the design pass** (from the 2026-10-12 review, not built): goals page (percentage on the bar, "+" for a new
+   goal as a sheet, celebrate completed goals), haptics (`expo-haptics`), small motion (item pop-in, pulsing today dot,
+   respect reduced motion).
 2. **Long-press a day on the Home grid for a quick look.** Instead of opening the day, a long press shows a short
    preview of that day's page on top of the Home screen (no navigation); letting go closes it, a normal tap still
    opens the day. Notes for when it is built:
@@ -168,14 +187,14 @@ Ideas from Moritz (2026-10-11), not started:
 
 Older items:
 
-3. **Offline gaps**: a start date changed while offline is not sent later (cloud wins at next start);
-   a photo added offline is not uploaded later (the item keeps a local file path).
+3. **Offline gap**: a start date changed while offline is not sent later (cloud wins at next start). (Photos added offline are
+   now uploaded when the day opens.)
 4. **Anonymous sign-up spam**: keep Supabase's Authentication rate limits low (dashboard) and consider CAPTCHA before
    TestFlight; the database limiter (migration 004) cannot stop account creation itself.
 5. **KLIPY logo** instead of the text mark "Powered by KLIPY"; Production key when more people use the app.
-6. **Handwriting fonts**: only Caveat so far; the refs use several journal fonts (fits together with skins).
+6. **Handwriting fonts**: notes are Caveat only; skins use Kalam / Cormorant for titles only.
 7. **Throwback books**, reminders, export / full account deletion (see PRD section 4).
-8. **Smaller dots** option for the grid (fits together with skins).
+8. **Smaller dots** option for the grid.
 9. **Native iOS build / EAS** (TestFlight) when the friends MVP starts. Not configured yet.
    Needs the KLIPY Production key, `expo-secure-store` for the session token, and an own-phone test.
 10. Housekeeping: `expo lint` reports 4 `set-state-in-effect` errors (see below); `eslint` 9 and `uuid` 7 show
@@ -203,12 +222,19 @@ Older items:
 - Selecting an item by tap waits about half a second (it waits to see if you double-tap).
 - Gesture code writes `.value` directly; if the React Compiler ever complains, switch to `.get()` / `.set()`.
 - Screen-reader users get select / edit / delete actions on items, but no way to move or resize yet.
+- Lint is the same 4 `set-state-in-effect` errors, nothing new.
+- **npm lock rule:** after any `npx expo install`, regenerate the lock with `npx --yes npm@10 install --package-lock-only` and check
+  `npx --yes npm@10 ci --dry-run` and `npx --yes npm@11 ci --dry-run` (CI runs Node 24 with npm 10; an npm 11 lock broke it once).
+- **Rendered checks without a phone:** web export with `.env` moved aside, `expo export --clear`, then Playwright with the local
+  chrome-headless-shell; settings are injected through `localStorage['ourlife.settings']`. Scripts lived in the session scratchpad
+  and are gone.
 - Android: a picked animated GIF only stays animated with picker `quality: 1` (iPhone keeps it as is).
 
 ## Open questions for Moritz
 
-1. Skins: which look first (playful / floral, retro, anime)?
-2. When does the iOS / TestFlight build start?
+1. Skins: keep these three, or add retro / anime / floral? Pattern strength OK?
+2. When does the iOS / TestFlight build start? Note: **Expo Go with SDK 57 needs iOS 16.4+** (an iPhone X can reach 16.7);
+   it loads on his girlfriend's phone now, so that was not the problem in the end.
 
 ## Decisions already made
 
@@ -217,7 +243,7 @@ author tracking (colours tell who wrote what); goals driven by typed commands;
 milestone countdown on Home removed (it did not feel cosy); anonymous sign-in, no email accounts;
 joined with a long random code. **2026-10-11:** every member is an admin (can remove people and make
 a new code), member limit 20 instead of 2; space has a name and members have names; the page has a
-fixed logical size; skins (later) are per phone; the long-press preview (later) is look-only; no own sticker collection (own GIFs and pictures go in as photos), the big
+fixed logical size; skins are per phone; the long-press preview (later) is look-only; no own sticker collection (own GIFs and pictures go in as photos), the big
 library is KLIPY.
 
 ## Things to know

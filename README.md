@@ -10,11 +10,11 @@ UI is English only. Personal content never goes in this repo.
 Repo: https://github.com/DieWahrePalme/OurLife (public)
 Web version: https://diewahrepalme.github.io/OurLife/
 
-## Status (2026-10-11)
+## Status (2026-10-12)
 
 Works on a phone (Expo Go), in a browser and on GitHub Pages. Phones join a space with a code
-and share days, goals, the start date and photos, live. **The work of 2026-10-11 (everything
-marked "new" below) is committed locally, not pushed, and has not been tried on a phone**, see `docs/HANDOFF.md`.
+and share days, goals, the start date and photos, live. Everything is committed and pushed.
+Skins and paste-sticker were tried on phones and work, see `docs/HANDOFF.md`.
 
 | Part | State |
 | --- | --- |
@@ -36,8 +36,13 @@ marked "new" below) is committed locally, not pushed, and has not been tried on 
 | Live sync of days, goals and start date between phones | done |
 | Photos in the private cloud bucket | done |
 | Web version on GitHub Pages | done (rebuilt on every push to `main`) |
-| Offline start date change and offline photo upload | not built |
-| Skins for the day list (floral, retro, anime, ...) | idea, not started |
+| Offline start date change | not built |
+| Day grid: filled days, mood dots, milestones (100 / 1y), Today button | new |
+| Day page: icon toolbar, day arrows, undo after delete | new |
+| Photos missing on the other phone are uploaded again when the day opens | new |
+| Skins per phone: Original, Scrapbook, Luxury (Settings > Look) | new, more skins possible |
+| Paste a cut-out sticker from the clipboard (iOS "Copy" on a subject) | new |
+| Goals page polish, haptics, small motion | idea, not started |
 | Long-press a day on Home for a quick preview | idea, not started |
 | Native iOS build (EAS / TestFlight) | not started |
 
@@ -93,7 +98,7 @@ REACT_NATIVE_PACKAGER_HOSTNAME=100.117.131.14 npx expo start --port 8082 --host 
 - Supabase Auth must keep **Email provider OFF** (only anonymous sign-ins), see `docs/HANDOFF.md`.
 - Merging and pushing are Moritz's decisions.
 
-## History (2026-10-05 to 11)
+## History (2026-10-05 to 12)
 
 1. PRD written from voice messages; project kicked off by the "boss" session.
 2. Expo skeleton + Supabase client packages; first commit.
@@ -113,5 +118,8 @@ REACT_NATIVE_PACKAGER_HOSTNAME=100.117.131.14 npx expo start --port 8082 --host 
     photos in a private bucket.
 13. (2026-10-11) Fixed page size on all devices, space setup with names, start date
     and goals, up to 20 members who are all admins, offline merge, KLIPY sticker and GIF library.
+
+14. (2026-10-12) Design pass: better contrast, filled-day grid, calendar anniversaries, toolbar icons, undo delete,
+    photo self-heal, three skins, paste a sticker from the clipboard.
 
 See `git log --oneline` for the full history.
