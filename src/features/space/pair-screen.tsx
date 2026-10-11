@@ -39,12 +39,12 @@ export function PairScreen() {
             <Text selectable accessibilityLabel={`Code ${pairCode}`} style={[styles.code, { color: colors.ink, backgroundColor: colors.page, borderColor: colors.line }]}>
               {pairCode}
             </Text>
-            {notice ? <Text style={{ color: colors.today, fontSize: 14 }}>{notice}</Text> : null}
+            {notice ? <Text style={{ color: colors.danger, fontSize: 14 }}>{notice}</Text> : null}
             <PillButton colors={colors} label={strings.pairContinue} onPress={confirmCreated} />
           </>
         ) : status === 'error' ? (
           <>
-            <Text accessibilityLiveRegion="polite" style={{ color: colors.today, fontSize: 15 }}>{error}</Text>
+            <Text accessibilityLiveRegion="polite" style={{ color: colors.danger, fontSize: 15 }}>{error}</Text>
             <PillButton colors={colors} label={strings.pairRetry} onPress={() => run(init)} disabled={busy} />
           </>
         ) : (
@@ -100,7 +100,7 @@ export function PairScreen() {
             )}
 
             {error ? (
-              <Text accessibilityLiveRegion="polite" style={{ color: colors.today, fontSize: 14 }}>
+              <Text accessibilityLiveRegion="polite" style={{ color: colors.danger, fontSize: 14 }}>
                 {error}
               </Text>
             ) : null}

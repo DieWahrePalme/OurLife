@@ -138,7 +138,7 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
       />
 
       {message ? (
-        <Text accessibilityLiveRegion="polite" style={{ color: colors.today, fontSize: 14 }}>{message}</Text>
+        <Text accessibilityLiveRegion="polite" style={{ color: colors.danger, fontSize: 14 }}>{message}</Text>
       ) : null}
     </>
   );

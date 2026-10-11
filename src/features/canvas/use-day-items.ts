@@ -23,6 +23,8 @@ interface DayItems {
   add: (item: CanvasItem) => void;
   update: (id: string, patch: Partial<CanvasItem>) => void;
   remove: (id: string) => void;
+  /** Puts a removed item back at its old place in the stacking order. */
+  restore: (item: CanvasItem, index: number) => void;
   bringToFront: (id: string) => void;
 }
 
@@ -195,6 +197,11 @@ export function useDayItems(dayNumber: number): DayItems {
     [],
   );
   const remove = useCallback((id: string) => setItems((prev) => prev.filter((it) => it.id !== id)), []);
+  const restore = useCallback(
+    (item: CanvasItem, index: number) =>
+      setItems((prev) => (prev.some((it) => it.id === item.id) ? prev : [...prev.slice(0, index), item, ...prev.slice(index)])),
+    [],
+  );
   const bringToFront = useCallback(
     (id: string) =>
       setItems((prev) => {
@@ -204,5 +211,5 @@ export function useDayItems(dayNumber: number): DayItems {
     [],
   );
 
-  return { items, canEdit, error, add, update, remove, bringToFront };
+  return { items, canEdit, error, add, update, remove, restore, bringToFront };
 }

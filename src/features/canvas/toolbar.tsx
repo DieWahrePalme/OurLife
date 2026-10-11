@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PEN_COLORS } from './types';
 import type { PaletteColors } from '@/constants/theme';
@@ -22,15 +24,19 @@ interface ToolbarProps {
   onDelete: () => void;
 }
 
-function ToolButton({ label, onPress, colors, danger = false }: { label: string; onPress: () => void; colors: PaletteColors; danger?: boolean }) {
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const ICON_SIZE = 24;
+
+/** An icon with its name below it, so every tool is recognised at a glance and still readable by name. */
+function ToolButton({ label, icon, onPress, colors, danger = false }: { label: string; icon: IconName; onPress: () => void; colors: PaletteColors; danger?: boolean }) {
+  const tint = danger ? colors.danger : colors.ink;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={[styles.button, { borderColor: danger ? colors.today : colors.line }]}
-    >
-      <Text style={[styles.buttonText, { color: danger ? colors.today : colors.ink }]}>{label}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.tool}>
+      <Ionicons name={icon} size={ICON_SIZE} color={tint} />
+      <Text numberOfLines={1} style={[styles.toolText, { color: tint }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -39,13 +45,13 @@ function AddRow(props: ToolbarProps) {
   const { colors } = props;
   return (
     <View style={styles.row}>
-      <ToolButton label={strings.addText} onPress={props.onAddText} colors={colors} />
-      <ToolButton label={strings.addSticker} onPress={props.onAddSticker} colors={colors} />
-      <ToolButton label={strings.addPhoto} onPress={props.onAddPhoto} colors={colors} />
-      <ToolButton label={strings.addTodo} onPress={props.onAddTodo} colors={colors} />
-      <ToolButton label={strings.addFocus} onPress={props.onAddFocus} colors={colors} />
-      <ToolButton label={strings.addMood} onPress={props.onAddMood} colors={colors} />
-      <ToolButton label={strings.addTape} onPress={props.onAddTape} colors={colors} />
+      <ToolButton label={strings.addText} icon="text-outline" onPress={props.onAddText} colors={colors} />
+      <ToolButton label={strings.addSticker} icon="happy-outline" onPress={props.onAddSticker} colors={colors} />
+      <ToolButton label={strings.addPhoto} icon="image-outline" onPress={props.onAddPhoto} colors={colors} />
+      <ToolButton label={strings.addTodo} icon="checkbox-outline" onPress={props.onAddTodo} colors={colors} />
+      <ToolButton label={strings.addFocus} icon="flag-outline" onPress={props.onAddFocus} colors={colors} />
+      <ToolButton label={strings.addMood} icon="heart-outline" onPress={props.onAddMood} colors={colors} />
+      <ToolButton label={strings.addTape} icon="bandage-outline" onPress={props.onAddTape} colors={colors} />
     </View>
   );
 }
@@ -68,8 +74,8 @@ function SelectionRow(props: ToolbarProps & { canRecolor: boolean }) {
             </Pressable>
           ))
         : null}
-      <ToolButton label={strings.toFront} onPress={props.onToFront} colors={colors} />
-      <ToolButton label={strings.delete} onPress={props.onDelete} colors={colors} danger />
+      <ToolButton label={strings.toFront} icon="layers-outline" onPress={props.onToFront} colors={colors} />
+      <ToolButton label={strings.delete} icon="trash-outline" onPress={props.onDelete} colors={colors} danger />
     </View>
   );
 }
@@ -82,9 +88,16 @@ export function Toolbar(props: ToolbarProps) {
   const hasSelection = props.selectedColor !== null;
   const [addHeight, setAddHeight] = useState(0);
   const [selectionHeight, setSelectionHeight] = useState(0);
+  // Lifts the tools above the home indicator and gives them some room from the screen edge.
+  const bottomPadding = BAR_PADDING + BAR_LIFT + useSafeAreaInsets().bottom;
 
   return (
-    <View style={[styles.bar, { borderTopColor: props.colors.line, minHeight: Math.max(addHeight, selectionHeight) + BAR_PADDING * 2 }]}>
+    <View
+      style={[
+        styles.bar,
+        { borderTopColor: props.colors.line, paddingBottom: bottomPadding, minHeight: Math.max(addHeight, selectionHeight) + BAR_PADDING + bottomPadding },
+      ]}
+    >
       {hasSelection ? <SelectionRow {...props} /> : <AddRow {...props} />}
       <View
         pointerEvents="none"
@@ -104,13 +117,14 @@ export function Toolbar(props: ToolbarProps) {
 }
 
 const BAR_PADDING = 10;
+const BAR_LIFT = 12;
 
 const styles = StyleSheet.create({
-  bar: { paddingVertical: BAR_PADDING, paddingHorizontal: 12, borderTopWidth: StyleSheet.hairlineWidth, justifyContent: 'center' },
+  bar: { paddingTop: BAR_PADDING, paddingHorizontal: 12, borderTopWidth: StyleSheet.hairlineWidth, justifyContent: 'center' },
   ghost: { position: 'absolute', left: 12, right: 12, top: 0, opacity: 0 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 14, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 15, fontWeight: '600' },
+  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  tool: { minHeight: 56, minWidth: 48, paddingHorizontal: 2, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  toolText: { fontSize: 11, fontWeight: '600' },
   swatchHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 2 },
 });

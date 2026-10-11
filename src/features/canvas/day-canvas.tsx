@@ -3,13 +3,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CanvasItemView } from './canvas-item';
-import { deletePhoto, isCloudPhoto, uploadPhoto } from './photo-cloud';
+import { uploadPhoto } from './photo-cloud';
 import { pickPhoto } from './photos';
 import { MoodSheet } from './mood-sheet';
 import { StickerSheet } from './sticker-sheet';
 import { TextModal } from './text-modal';
 import { Toolbar } from './toolbar';
+import { UndoBar } from './undo-bar';
 import { useDayItems } from './use-day-items';
+import { useUndoDelete } from './use-undo-delete';
 import { PEN_COLORS, type CanvasItem, type Task } from './types';
 import type { PaletteColors } from '@/constants/theme';
 import { strings } from '@/constants/strings';
@@ -62,7 +64,8 @@ function newId(): string {
 }
 
 export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
-  const { items, canEdit, error, add, update, remove, bringToFront } = useDayItems(dayNumber);
+  const { items, canEdit, error, add, update, remove, restore, bringToFront } = useDayItems(dayNumber);
+  const { deleted, deleteItem, undo } = useUndoDelete(items, remove, restore);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const lastSelectAt = useRef(0);
   const [available, setAvailable] = useState({ width: 0, height: 0 });
@@ -153,12 +156,10 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
 
   const removeItem = useCallback(
     (id: string) => {
-      const removed = items.find((it) => it.id === id);
-      if (removed?.kind === 'photo' && isCloudPhoto(removed.content)) deletePhoto(removed.content);
-      remove(id);
+      deleteItem(id);
       setSelectedId((current) => (current === id ? null : current));
     },
-    [remove, items],
+    [deleteItem],
   );
 
   const onSelect = useCallback((id: string) => {
@@ -181,6 +182,11 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
               { backgroundColor: colors.page, borderColor: colors.line, transform: [{ scale: pageScale }] },
             ]}
           >
+            {items.length === 0 && canEdit ? (
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.emptyHint]}>
+                <Text style={[styles.emptyHintText, { color: colors.inkSoft }]}>{strings.emptyDayHint}</Text>
+              </View>
+            ) : null}
             {items.map((item) => (
               <CanvasItemView
                 key={item.id}
@@ -195,8 +201,9 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
             ))}
           </Pressable>
         </View>
+        {deleted ? <UndoBar colors={colors} onUndo={undo} /> : null}
         {error ?? photoError ? (
-          <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.today }]}>
+          <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.danger }]}>
             {error ?? photoError}
           </Text>
         ) : null}
@@ -216,9 +223,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         onPickColor={(color) => selected && update(selected.id, { color })}
         onToFront={() => selected && bringToFront(selected.id)}
         onDelete={() => {
-          if (!selected) return;
-          remove(selected.id);
-          setSelectedId(null);
+          if (selected) removeItem(selected.id);
         }}
       />
       ) : null}
@@ -266,4 +271,6 @@ const styles = StyleSheet.create({
     transformOrigin: 'top left',
   },
   error: { textAlign: 'center', paddingTop: 6, fontSize: 13 },
+  emptyHint: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  emptyHintText: { fontFamily: 'Caveat_700Bold', fontSize: 32, lineHeight: 44, textAlign: 'center' },
 });

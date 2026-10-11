@@ -49,7 +49,7 @@ export default function GoalsScreen() {
           >
             <Text style={[styles.name, { color: colors.ink }]}>{goal.name}</Text>
             <Text style={[styles.meta, { color: colors.inkSoft }]}>{label}</Text>
-            <ProgressBar progress={progressFor(goal, total)} fill={colors.dotPast} track={colors.line} label={goal.name} />
+            <ProgressBar progress={progressFor(goal, total)} fill={colors.dotPast} track={colors.track} label={goal.name} />
           </Pressable>
         );
       })}

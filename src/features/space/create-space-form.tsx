@@ -64,7 +64,7 @@ export function CreateSpaceForm({ colors, initialStartDate, busy, onSubmit, onBa
           <Text style={{ color: colors.ink, fontSize: 15, flex: 1 }}>
             {goal.name} · {goal.target} {goal.unit}
           </Text>
-          <Text style={{ color: colors.today, fontSize: 18 }}>×</Text>
+          <Text style={{ color: colors.danger, fontSize: 18 }}>×</Text>
         </Pressable>
       ))}
       <NewGoalForm
@@ -74,7 +74,7 @@ export function CreateSpaceForm({ colors, initialStartDate, busy, onSubmit, onBa
       />
 
       {error ? (
-        <Text accessibilityLiveRegion="polite" style={{ color: colors.today, fontSize: 14 }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: colors.danger, fontSize: 14 }}>
           {error}
         </Text>
       ) : null}

@@ -60,7 +60,7 @@ export function LibraryGrid({ kind, colors, onPick }: LibraryGridProps) {
         ListEmptyComponent={
           loading ? null : failed ? (
             <Pressable accessibilityRole="button" onPress={retry}>
-              <Text accessibilityLiveRegion="polite" style={{ color: colors.today, textAlign: 'center', fontSize: 14 }}>
+              <Text accessibilityLiveRegion="polite" style={{ color: colors.danger, textAlign: 'center', fontSize: 14 }}>
                 {strings.libraryLoadFailed}
               </Text>
             </Pressable>
@@ -73,7 +73,7 @@ export function LibraryGrid({ kind, colors, onPick }: LibraryGridProps) {
             <ActivityIndicator style={styles.spinner} color={colors.inkSoft} />
           ) : failed && items.length > 0 ? (
             <Pressable accessibilityRole="button" onPress={loadMore}>
-              <Text style={{ color: colors.today, textAlign: 'center', fontSize: 14 }}>{strings.libraryLoadFailed}</Text>
+              <Text style={{ color: colors.danger, textAlign: 'center', fontSize: 14 }}>{strings.libraryLoadFailed}</Text>
             </Pressable>
           ) : null
         }

@@ -46,7 +46,7 @@ export function StickerSheet({ visible, colors, onPick, onClose }: StickerSheetP
                 onPress={() => setTab(t.key)}
                 style={[styles.tab, { backgroundColor: t.key === tab ? colors.dotPast : colors.page, borderColor: colors.line }]}
               >
-                <Text style={{ color: t.key === tab ? '#fff' : colors.ink, fontWeight: '600' }}>{t.label}</Text>
+                <Text style={{ color: t.key === tab ? colors.onAccent : colors.ink, fontWeight: '600' }}>{t.label}</Text>
               </Pressable>
             ))}
           </View>

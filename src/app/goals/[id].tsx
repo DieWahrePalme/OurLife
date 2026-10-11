@@ -50,7 +50,7 @@ export default function GoalDetailScreen() {
         {strings.goalTotal(plain(total), plain(goal.target))}
       </Text>
       {goal.deadline ? <Text style={[styles.meta, { color: colors.inkSoft }]}>{strings.goalDeadline(goal.deadline)}</Text> : null}
-      <ProgressBar progress={progressFor(goal, total)} fill={colors.dotPast} track={colors.line} label={goal.name} />
+      <ProgressBar progress={progressFor(goal, total)} fill={colors.dotPast} track={colors.track} label={goal.name} />
       <Text accessibilityRole="header" style={[styles.section, { color: colors.ink }]}>{strings.goalEntriesTitle}</Text>
       {mine.length === 0 ? <Text style={[styles.meta, { color: colors.inkSoft }]}>{strings.goalNoEntries}</Text> : null}
       {mine.map((entry) => (
@@ -74,9 +74,9 @@ export default function GoalDetailScreen() {
           await removeGoal(goal.id);
           router.back();
         }}
-        style={[styles.delete, { borderColor: colors.today }]}
+        style={[styles.delete, { borderColor: colors.danger }]}
       >
-        <Text style={{ color: colors.today, fontSize: 15, fontWeight: '600' }}>{strings.goalDelete}</Text>
+        <Text style={{ color: colors.danger, fontSize: 15, fontWeight: '600' }}>{strings.goalDelete}</Text>
       </Pressable>
     </ScrollView>
   );

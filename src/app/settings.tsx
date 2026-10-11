@@ -43,7 +43,7 @@ export default function SettingsScreen() {
             onPress={() => update({ appearance: option })}
             style={[styles.segment, { borderColor: colors.line, backgroundColor: option === appearance ? colors.dotPast : colors.page }]}
           >
-            <Text style={{ color: option === appearance ? '#fff' : colors.ink, fontWeight: '600' }}>{APPEARANCE_LABEL[option]}</Text>
+            <Text style={{ color: option === appearance ? colors.onAccent : colors.ink, fontWeight: '600' }}>{APPEARANCE_LABEL[option]}</Text>
           </Pressable>
         ))}
       </View>
@@ -78,12 +78,12 @@ export default function SettingsScreen() {
         style={[styles.input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.page }]}
       />
       {message ? (
-        <Text accessibilityLiveRegion="polite" style={{ color: message.isError ? colors.today : colors.inkSoft, fontSize: 14 }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: message.isError ? colors.danger : colors.inkSoft, fontSize: 14 }}>
           {message.text}
         </Text>
       ) : null}
       <Pressable accessibilityRole="button" onPress={saveDate} style={[styles.button, { backgroundColor: colors.dotPast }]}>
-        <Text style={styles.buttonText}>{strings.settingsStartSave}</Text>
+        <Text style={[styles.buttonText, { color: colors.onAccent }]}>{strings.settingsStartSave}</Text>
       </Pressable>
 
       {inSpace ? <SpaceSection colors={colors} /> : null}
@@ -104,5 +104,5 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
   code: { paddingVertical: 12, lineHeight: 24 },
   button: { minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  buttonText: { fontSize: 16, fontWeight: '700' },
 });

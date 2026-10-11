@@ -60,7 +60,7 @@ export function TextModal({ visible, initialText, placeholder, colors, goalNames
             </View>
           ) : null}
           {error ? (
-            <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.today }]}>
+            <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.danger }]}>
               {error}
             </Text>
           ) : null}
@@ -75,7 +75,7 @@ export function TextModal({ visible, initialText, placeholder, colors, goalNames
               onPress={() => setError(onSave(text.trim()))}
               style={[styles.button, { backgroundColor: colors.dotPast, opacity: canSave ? 1 : 0.4 }]}
             >
-              <Text style={[styles.buttonText, { color: '#fff' }]}>{strings.textSave}</Text>
+              <Text style={[styles.buttonText, { color: colors.onAccent }]}>{strings.textSave}</Text>
             </Pressable>
           </View>
         </View>

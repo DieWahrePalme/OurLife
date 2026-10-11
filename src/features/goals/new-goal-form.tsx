@@ -50,12 +50,12 @@ export function NewGoalForm({ colors, existingNames, onCreate }: NewGoalFormProp
       </View>
       <TextInput style={field} value={deadline} onChangeText={setDeadline} autoCapitalize="none" placeholder={strings.goalDeadlinePlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.goalDeadlinePlaceholder} />
       {error ? (
-        <Text accessibilityLiveRegion="polite" style={{ color: colors.today, fontSize: 14 }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: colors.danger, fontSize: 14 }}>
           {error}
         </Text>
       ) : null}
       <Pressable accessibilityRole="button" onPress={submit} style={[styles.button, { backgroundColor: colors.dotPast }]}>
-        <Text style={styles.buttonText}>{strings.goalCreate}</Text>
+        <Text style={[styles.buttonText, { color: colors.onAccent }]}>{strings.goalCreate}</Text>
       </Pressable>
     </View>
   );
@@ -68,5 +68,5 @@ const styles = StyleSheet.create({
   unit: { width: 110 },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
   button: { minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  buttonText: { fontSize: 16, fontWeight: '700' },
 });

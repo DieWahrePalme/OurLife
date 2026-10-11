@@ -20,12 +20,12 @@ export function PillButton({ colors, label, onPress, disabled = false, accessibi
       onPress={onPress}
       style={[styles.button, { backgroundColor: colors.dotPast, opacity: disabled ? 0.5 : 1 }]}
     >
-      <Text style={styles.text}>{label}</Text>
+      <Text style={[styles.text, { color: colors.onAccent }]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: { minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  text: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  text: { fontSize: 16, fontWeight: '700' },
 });
