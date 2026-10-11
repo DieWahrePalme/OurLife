@@ -1,20 +1,44 @@
-import { Caveat_700Bold, useFonts } from '@expo-google-fonts/caveat';
-import { Stack } from 'expo-router';
+import { Caveat_700Bold } from '@expo-google-fonts/caveat';
+import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond';
+import { Kalam_700Bold } from '@expo-google-fonts/kalam';
+import { useFonts } from 'expo-font';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { Palette } from '@/constants/theme';
+import { SkinBackground } from '@/components/skin-background';
+import type { PaletteColors } from '@/constants/theme';
+import type { Skin } from '@/constants/skins';
 import { useGoalsStore } from '@/features/goals/goals-store';
 import { PairScreen } from '@/features/space/pair-screen';
 import { useSpaceStore } from '@/features/space/space-store';
 import { useSettingsStore } from '@/features/settings/settings-store';
 import { subscribeToTable } from '@/features/sync/realtime';
-import { useScheme } from '@/lib/use-theme';
+import { useColors, useScheme, useSkin } from '@/lib/use-theme';
+
+/** The navigation draws its own screen background; it has to be see-through so the skin shows. */
+const SEE_THROUGH_THEME = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: 'transparent', card: 'transparent' },
+};
+
+/** Backdrop colour and pattern of the chosen skin, behind every screen. */
+function SkinFrame({ skin, colors, children }: { skin: Skin; colors: PaletteColors; children: ReactNode }) {
+  return (
+    <View style={[styles.frame, { backgroundColor: colors.paper }]}>
+      {skin.pattern ? <SkinBackground pattern={skin.pattern} /> : null}
+      {children}
+    </View>
+  );
+}
 
 export default function RootLayout() {
   const scheme = useScheme();
-  const colors = Palette[scheme];
-  const [fontsLoaded] = useFonts({ Caveat_700Bold });
+  const skin = useSkin();
+  const colors = useColors();
+  const statusBar = skin.statusBar[scheme];
+  const [fontsLoaded] = useFonts({ Caveat_700Bold, CormorantGaramond_700Bold, Kalam_700Bold });
 
   const settingsLoaded = useSettingsStore((state) => state.loaded);
   const loadSettings = useSettingsStore((state) => state.load);
@@ -39,22 +63,23 @@ export default function RootLayout() {
 
   if (spaceStatus === 'pairing' || spaceStatus === 'created' || spaceStatus === 'error') {
     return (
-      <>
-        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <SkinFrame skin={skin} colors={colors}>
+        <StatusBar style={statusBar} />
         <PairScreen />
-      </>
+      </SkinFrame>
     );
   }
 
   return (
-    <>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+    <SkinFrame skin={skin} colors={colors}>
+      <StatusBar style={statusBar} />
+      <ThemeProvider value={SEE_THROUGH_THEME}>
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.paper },
+          headerStyle: { backgroundColor: skin.pattern ? 'transparent' : colors.paper },
           headerTintColor: colors.ink,
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: colors.paper },
+          contentStyle: { backgroundColor: 'transparent' },
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -63,6 +88,9 @@ export default function RootLayout() {
         <Stack.Screen name="goals/index" options={{ title: 'Goals', headerBackTitle: 'Back' }} />
         <Stack.Screen name="goals/[id]" options={{ title: '', headerBackTitle: 'Goals' }} />
       </Stack>
-    </>
+      </ThemeProvider>
+    </SkinFrame>
   );
 }
+
+const styles = StyleSheet.create({ frame: { flex: 1 } });

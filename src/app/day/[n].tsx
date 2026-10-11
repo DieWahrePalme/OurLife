@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useColors } from '@/lib/use-theme';
+import { titleSize } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 import { useSettingsStore } from '@/features/settings/settings-store';
 import { DayCanvas } from '@/features/canvas/day-canvas';
@@ -52,7 +53,7 @@ export default function DayScreen() {
       <View style={styles.header}>
         <DayArrow icon="chevron-back" label={strings.previousDay} disabled={dayNumber <= 1} color={colors.ink} onPress={() => goTo(dayNumber - 1)} />
         <View style={styles.titles}>
-          <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.ink, fontFamily: colors.fontDisplay, fontSize: titleSize(colors, 44), lineHeight: titleSize(colors, 64) }]}>
             {strings.dayTitle(dayNumber)}
           </Text>
           <Text style={[styles.date, { color: colors.inkSoft }]}>

@@ -1,6 +1,7 @@
 import { useColorScheme } from 'react-native';
 
-import { Palette, type PaletteColors } from '@/constants/theme';
+import { skinFor, type Skin } from '@/constants/skins';
+import type { PaletteColors } from '@/constants/theme';
 import { useSettingsStore } from '@/features/settings/settings-store';
 
 /** "light" or "dark": the person's choice in Settings, or the phone's setting when it is on "system". */
@@ -11,6 +12,11 @@ export function useScheme(): 'light' | 'dark' {
   return system === 'dark' ? 'dark' : 'light';
 }
 
+/** The look chosen for this phone. */
+export function useSkin(): Skin {
+  return skinFor(useSettingsStore((state) => state.skin));
+}
+
 export function useColors(): PaletteColors {
-  return Palette[useScheme()];
+  return useSkin().palettes[useScheme()];
 }

@@ -1,3 +1,4 @@
+import * as Clipboard from 'expo-clipboard';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
@@ -34,4 +35,28 @@ export async function pickPhoto(id: string): Promise<PickedPhoto | null> {
   const asset = result.assets[0];
   const uri = await keepPhoto(asset.uri, id);
   return { uri, aspect: asset.width > 0 && asset.height > 0 ? asset.width / asset.height : 1 };
+}
+
+const DATA_URI_PREFIX = /^data:image\/png;base64,/;
+
+function bytesFromBase64(base64: string): Uint8Array {
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+/**
+ * The image on the clipboard (for example a subject lifted from a photo with "Copy" on iOS) as a PNG
+ * file in the app's own folder. Returns null when the clipboard holds no image.
+ */
+export async function pasteClipboardImage(id: string): Promise<PickedPhoto | null> {
+  if (!(await Clipboard.hasImageAsync())) return null;
+  const image = await Clipboard.getImageAsync({ format: 'png' });
+  if (!image || image.size.width <= 0 || image.size.height <= 0) return null;
+  const aspect = image.size.width / image.size.height;
+  if (Platform.OS === 'web') return { uri: image.data, aspect };
+  const folder = new Directory(Paths.document, PHOTO_DIR);
+  folder.create({ idempotent: true });
+  const target = new File(folder, `${id}.png`);
+  target.write(bytesFromBase64(image.data.replace(DATA_URI_PREFIX, '')));
+  return { uri: target.uri, aspect };
 }

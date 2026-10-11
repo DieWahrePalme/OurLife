@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PillButton } from '@/components/pill-button';
 import { useColors } from '@/lib/use-theme';
 import { strings } from '@/constants/strings';
+import { titleSize } from '@/constants/theme';
 import { useSettingsStore } from '@/features/settings/settings-store';
 
 import { CreateSpaceForm } from './create-space-form';
@@ -27,9 +28,9 @@ export function PairScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.paper }]}>
+    <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink, fontFamily: colors.fontDisplay, fontSize: titleSize(colors, 56), lineHeight: titleSize(colors, 76) }]}>
           {status === 'created' ? strings.pairCreatedTitle : strings.pairTitle}
         </Text>
 
@@ -61,7 +62,7 @@ export function PairScreen() {
               />
             ) : (
               <View style={[styles.card, { backgroundColor: colors.page, borderColor: colors.line }]}>
-                <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>{strings.pairCreateTitle}</Text>
+                <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.pairCreateTitle}</Text>
                 <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.pairCreateHint}</Text>
                 <PillButton colors={colors} label={strings.pairCreateButton} onPress={() => setCreating(true)} />
               </View>
@@ -69,7 +70,7 @@ export function PairScreen() {
 
             {creating ? null : (
             <View style={[styles.card, { backgroundColor: colors.page, borderColor: colors.line }]}>
-              <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>{strings.pairJoinTitle}</Text>
+              <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.pairJoinTitle}</Text>
               <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.pairJoinHint}</Text>
               <TextInput
                 value={code}

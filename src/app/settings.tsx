@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { useColors } from '@/lib/use-theme';
+import { useColors, useSkin } from '@/lib/use-theme';
+import { SkinPicker } from '@/features/settings/skin-picker';
 import { strings } from '@/constants/strings';
 import { PEN_COLORS } from '@/features/canvas/types';
 import { SpaceSection } from '@/features/space/space-section';
@@ -16,6 +17,7 @@ const APPEARANCE_LABEL: Readonly<Record<Appearance, string>> = {
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const skin = useSkin();
   const { penColor, startDate, appearance, update } = useSettingsStore();
   const inSpace = useSpaceStore((state) => state.status === 'ready');
   const [draftDate, setDraftDate] = useState(startDate);
@@ -32,9 +34,14 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>{strings.settingsAppearanceTitle}</Text>
-      <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsAppearanceHint}</Text>
-      <View style={styles.segments} accessibilityRole="radiogroup">
+      <Text accessibilityRole="header" style={[styles.title, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsSkinTitle}</Text>
+      <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsSkinHint}</Text>
+      <SkinPicker colors={colors} selected={skin.id} onSelect={(id) => update({ skin: id })} />
+
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsAppearanceTitle}</Text>
+      <Text style={[styles.hint, { color: colors.inkSoft }]}>{skin.followsAppearance ? strings.settingsAppearanceHint : strings.appearanceFixedHint}</Text>
+      {skin.followsAppearance ? (
+        <View style={styles.segments} accessibilityRole="radiogroup">
         {APPEARANCES.map((option) => (
           <Pressable
             key={option}
@@ -46,9 +53,10 @@ export default function SettingsScreen() {
             <Text style={{ color: option === appearance ? colors.onAccent : colors.ink, fontWeight: '600' }}>{APPEARANCE_LABEL[option]}</Text>
           </Pressable>
         ))}
-      </View>
+        </View>
+      ) : null}
 
-      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsColorTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsColorTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsColorHint}</Text>
       <View style={styles.swatches}>
         {PEN_COLORS.map((color) => (
@@ -65,7 +73,7 @@ export default function SettingsScreen() {
         ))}
       </View>
 
-      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsStartTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsStartTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsStartHint}</Text>
       <TextInput
         value={draftDate}

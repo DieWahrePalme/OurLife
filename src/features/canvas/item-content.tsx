@@ -5,7 +5,7 @@ import { formatAmount } from '@/features/goals/command';
 import { useGoalsStore } from '@/features/goals/goals-store';
 import { moodFor } from './moods';
 import { isKlipyUrl } from './klipy';
-import { usePhotoUri } from './photo-cloud';
+import { isCloudPhoto, usePhotoUri } from './photo-cloud';
 import type { CanvasItem } from './types';
 import { strings } from '@/constants/strings';
 
@@ -61,10 +61,25 @@ function ImageSticker({ item }: { item: CanvasItem }) {
   );
 }
 
+/** A sticker pasted from the clipboard: a picture in the cloud (or still a file on this phone), no frame. */
+function PastedSticker({ item }: { item: CanvasItem }) {
+  const uri = usePhotoUri(item.content);
+  return (
+    <Image
+      source={uri ? { uri } : undefined}
+      style={{ width: IMAGE_STICKER_SIZE, aspectRatio: item.aspect ?? 1 }}
+      contentFit="contain"
+      accessibilityLabel={strings.stickerLabel}
+    />
+  );
+}
+
 export function ItemContent({ item, onChange }: ItemContentProps) {
   switch (item.kind) {
     case 'sticker':
-      return isKlipyUrl(item.content) ? <ImageSticker item={item} /> : <Text style={styles.sticker}>{item.content}</Text>;
+      if (isKlipyUrl(item.content)) return <ImageSticker item={item} />;
+      if (isCloudPhoto(item.content) || /^(file|data|blob):/i.test(item.content)) return <PastedSticker item={item} />;
+      return <Text style={styles.sticker}>{item.content}</Text>;
     case 'tape':
       return <View style={[styles.tape, { backgroundColor: item.color }]} />;
     case 'photo':

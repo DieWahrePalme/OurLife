@@ -16,7 +16,7 @@ export function MoodSheet({ visible, colors, onPick, onClose }: MoodSheetProps) 
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable accessibilityRole="button" accessibilityLabel={strings.close} style={styles.backdrop} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: colors.paper }]}>
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink, fontFamily: colors.fontDisplay }]}>
           {strings.moodSheetTitle}
         </Text>
         <View style={styles.row}>

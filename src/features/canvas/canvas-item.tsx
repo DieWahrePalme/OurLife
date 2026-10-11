@@ -9,6 +9,7 @@ import { useGoalsStore } from '@/features/goals/goals-store';
 import { ItemContent } from './item-content';
 import { moodFor } from './moods';
 import { isKlipyUrl } from './klipy';
+import { isCloudPhoto } from './photo-cloud';
 import { MAX_SCALE, MIN_SCALE, type CanvasItem, type ItemKind } from './types';
 
 interface CanvasItemViewProps {
@@ -36,7 +37,7 @@ function labelFor(item: CanvasItem, goalName: string | undefined): string {
   if (item.kind === 'todo') return strings.todoTitle;
   if (item.kind === 'mood') return moodFor(item.content).label;
   if (item.kind === 'goal') return `${goalName ?? 'Goal'} ${item.amount ?? ''}`.trim();
-  if (item.kind === 'sticker') return isKlipyUrl(item.content) ? strings.stickerLabel : `Sticker ${item.content}`;
+  if (item.kind === 'sticker') return isKlipyUrl(item.content) || isCloudPhoto(item.content) ? strings.stickerLabel : `Sticker ${item.content}`;
   return item.content;
 }
 

@@ -47,14 +47,14 @@ export default function GoalsScreen() {
             onPress={() => router.push({ pathname: '/goals/[id]', params: { id: goal.id } })}
             style={[styles.card, { backgroundColor: colors.page, borderColor: colors.line }]}
           >
-            <Text style={[styles.name, { color: colors.ink }]}>{goal.name}</Text>
+            <Text style={[styles.name, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{goal.name}</Text>
             <Text style={[styles.meta, { color: colors.inkSoft }]}>{label}</Text>
             <ProgressBar progress={progressFor(goal, total)} fill={colors.dotPast} track={colors.track} label={goal.name} />
           </Pressable>
         );
       })}
       <View style={styles.formWrap}>
-        <Text accessibilityRole="header" style={[styles.formTitle, { color: colors.ink }]}>{strings.newGoalTitle}</Text>
+        <Text accessibilityRole="header" style={[styles.formTitle, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.newGoalTitle}</Text>
         <NewGoalForm colors={colors} existingNames={goals.map((g) => g.name)} onCreate={addGoal} />
       </View>
     </ScrollView>

@@ -15,6 +15,8 @@ interface StickerSheetProps {
   /** An emoji, or the address of a library sticker or GIF together with its width / height. */
   onPick: (content: string, aspect?: number) => void;
   onClose: () => void;
+  /** Puts the image from the clipboard on the page. Returns a message to show when nothing was pasted. */
+  onPaste: () => Promise<string | null>;
 }
 
 const TABS: readonly { key: Tab; label: string }[] = [
@@ -24,8 +26,9 @@ const TABS: readonly { key: Tab; label: string }[] = [
 ];
 
 /** A layer on top of the page, not a Modal: the photo library also opens fine from here on iOS. */
-export function StickerSheet({ visible, colors, onPick, onClose }: StickerSheetProps) {
+export function StickerSheet({ visible, colors, onPick, onClose, onPaste }: StickerSheetProps) {
   const [tab, setTab] = useState<Tab>(klipyAvailable ? 'stickers' : 'emoji');
+  const [pasteMessage, setPasteMessage] = useState<string | null>(null);
   if (!visible) return null;
   const tabs = klipyAvailable ? TABS : TABS.filter((t) => t.key === 'emoji');
 
@@ -33,9 +36,19 @@ export function StickerSheet({ visible, colors, onPick, onClose }: StickerSheetP
     <View style={styles.overlay}>
       <Pressable accessibilityRole="button" accessibilityLabel={strings.close} style={styles.backdrop} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: colors.paper }]}>
-        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>
+        <Text accessibilityRole="header" style={[styles.title, { color: colors.ink, fontFamily: colors.fontDisplay }]}>
           {strings.stickerSheetTitle}
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={strings.pasteSticker}
+          accessibilityHint={strings.pasteHint}
+          onPress={async () => setPasteMessage(await onPaste())}
+          style={[styles.pasteButton, { borderColor: colors.dotPast }]}
+        >
+          <Text style={{ color: colors.dotPast, fontWeight: '600' }}>{strings.pasteSticker}</Text>
+        </Pressable>
+        {pasteMessage ? <Text style={[styles.pasteMessage, { color: colors.danger }]}>{pasteMessage}</Text> : null}
         {tabs.length > 1 ? (
           <View style={styles.tabs} accessibilityRole="tablist">
             {tabs.map((t) => (
@@ -87,6 +100,8 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Caveat_700Bold', fontSize: 30, lineHeight: 42, textAlign: 'center' },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 10, justifyContent: 'center' },
   tab: { minHeight: 40, paddingHorizontal: 18, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pasteButton: { alignSelf: 'center', minHeight: 40, paddingHorizontal: 18, marginBottom: 10, borderRadius: 20, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  pasteMessage: { textAlign: 'center', fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },
   groups: { padding: 16, gap: 14 },
   group: { gap: 6 },
   groupTitle: { fontSize: 13, fontWeight: '600' },

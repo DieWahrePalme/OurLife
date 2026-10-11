@@ -10,6 +10,7 @@ import { useSettingsStore } from '@/features/settings/settings-store';
 import { useSpaceStore } from '@/features/space/space-store';
 import { DayGrid } from '@/components/day-grid';
 import { useColors } from '@/lib/use-theme';
+import { titleSize } from '@/constants/theme';
 import { strings } from '@/constants/strings';
 import { dayNumberFor, formatDay, parseIsoDate, todayStamp } from '@/lib/dates';
 
@@ -39,7 +40,7 @@ export default function HomeScreen() {
   }, [refreshSummaries]);
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.paper }]}>
+    <SafeAreaView style={styles.screen}>
       <View style={[styles.header, { borderBottomColor: colors.line }]}>
         <Link href="/settings" asChild>
           <Pressable accessibilityRole="link" accessibilityLabel={strings.settingsTitle} style={styles.settingsLink}>
@@ -51,7 +52,7 @@ export default function HomeScreen() {
             <Text style={[styles.goalsText, { color: colors.dotPast }]}>{strings.goalsTitle}</Text>
           </Pressable>
         </Link>
-        <Text accessibilityRole="header" style={[styles.number, { color: colors.ink }]}>
+        <Text accessibilityRole="header" style={[styles.number, { color: colors.ink, fontFamily: colors.fontDisplay, fontSize: titleSize(colors, 64), lineHeight: titleSize(colors, 92) }]}>
           {strings.dayTitle(todayNumber)}
         </Text>
         <Text style={[styles.sub, { color: colors.inkSoft }]}>

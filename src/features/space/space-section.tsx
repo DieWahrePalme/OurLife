@@ -63,11 +63,11 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
 
   return (
     <>
-      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsSpaceNameTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsSpaceNameTitle}</Text>
       <TextInput style={field} value={nameDraft} onChangeText={setNameDraft} maxLength={60} accessibilityLabel={strings.settingsSpaceNameTitle} />
       <PillButton colors={colors} label={strings.settingsSpaceNameSave} disabled={!nameDraft.trim()} onPress={() => attempt(() => renameSpace(nameDraft), 'Saved.')} />
 
-      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsCodeTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsCodeTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsCodeHint}</Text>
       <Text selectable style={[field, styles.code]}>{pairCode}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsCodeNewHint}</Text>
@@ -81,7 +81,7 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
         }}
       />
 
-      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsMembersTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsMembersTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsMembersHint}</Text>
       {members.map((member) => {
         const isMe = member.userId === myId;
@@ -121,7 +121,7 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
         }, 'Saved.')}
       />
 
-      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink }]}>{strings.settingsLeaveTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsLeaveTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>
         {members.length === 1 ? strings.settingsLeaveHintLast : strings.settingsLeaveHint}
       </Text>

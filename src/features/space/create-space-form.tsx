@@ -39,7 +39,7 @@ export function CreateSpaceForm({ colors, initialStartDate, busy, onSubmit, onBa
 
   return (
     <View style={[styles.card, { backgroundColor: colors.page, borderColor: colors.line }]}>
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.ink }]}>{strings.setupTitle}</Text>
+      <Text accessibilityRole="header" style={[styles.title, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.setupTitle}</Text>
 
       <Text style={label}>{strings.setupSpaceName}</Text>
       <TextInput style={field} value={spaceName} onChangeText={setSpaceName} maxLength={60} placeholder={strings.setupSpaceNamePlaceholder} placeholderTextColor={colors.inkSoft} accessibilityLabel={strings.setupSpaceName} />

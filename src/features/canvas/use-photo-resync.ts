@@ -6,6 +6,13 @@ import { isCloudPhoto, uploadPhoto } from './photo-cloud';
 import type { CanvasItem } from './types';
 
 const isHttp = (content: string) => /^https?:/i.test(content);
+const isFileUri = (content: string) => /^file:/i.test(content);
+
+/** A photo, or a pasted sticker, that still only exists as a file on this phone. */
+function isLocalImage(item: CanvasItem): boolean {
+  if (isCloudPhoto(item.content) || isHttp(item.content)) return false;
+  return item.kind === 'photo' || (item.kind === 'sticker' && isFileUri(item.content));
+}
 
 /**
  * A photo that only exists as a file on this phone (the upload failed or the phone was offline)
@@ -23,7 +30,7 @@ export function usePhotoResync(
     const spaceId = getSpaceId();
     if (!canEdit || !spaceId) return;
     for (const item of items) {
-      if (item.kind !== 'photo' || isCloudPhoto(item.content) || isHttp(item.content) || tried.current.has(item.id)) continue;
+      if (!isLocalImage(item) || tried.current.has(item.id)) continue;
       tried.current.add(item.id);
       uploadPhoto(spaceId, item.id, item.content)
         .then((content) => update(item.id, { content }))

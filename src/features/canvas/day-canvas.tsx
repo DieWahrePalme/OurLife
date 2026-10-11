@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CanvasItemView } from './canvas-item';
 import { uploadPhoto } from './photo-cloud';
-import { pickPhoto } from './photos';
+import { pasteClipboardImage, pickPhoto } from './photos';
 import { MoodSheet } from './mood-sheet';
 import { StickerSheet } from './sticker-sheet';
 import { TextModal } from './text-modal';
@@ -127,6 +127,24 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     }
   };
 
+  /** A cut-out subject from Photos: kept as a sticker and shared like a photo. */
+  const pasteSticker = async (): Promise<string | null> => {
+    try {
+      const id = newId();
+      const image = await pasteClipboardImage(id);
+      if (!image) return strings.pasteEmpty;
+      spawn({ id, kind: 'sticker', content: image.uri, color: penColor, aspect: image.aspect });
+      setStickerOpen(false);
+      const spaceId = getSpaceId();
+      if (spaceId) {
+        update(id, { content: await uploadPhoto(spaceId, id, image.uri) });
+      }
+      return null;
+    } catch {
+      return strings.pasteFailed;
+    }
+  };
+
   const editedItem = editor?.mode === 'edit' ? (items.find((it) => it.id === editor.id) ?? null) : null;
   const editorKind: EditableKind | null = editor ? (editor.mode === 'new' ? editor.kind : (editedItem?.kind as EditableKind | undefined) ?? null) : null;
 
@@ -181,12 +199,12 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
             }}
             style={[
               styles.page,
-              { backgroundColor: colors.page, borderColor: colors.line, transform: [{ scale: pageScale }] },
+              { backgroundColor: colors.sheet, borderColor: colors.line, transform: [{ scale: pageScale }] },
             ]}
           >
             {items.length === 0 && canEdit ? (
               <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.emptyHint]}>
-                <Text style={[styles.emptyHintText, { color: colors.inkSoft }]}>{strings.emptyDayHint}</Text>
+                <Text style={[styles.emptyHintText, { color: colors.sheetInkSoft, fontFamily: colors.fontDisplay }]}>{strings.emptyDayHint}</Text>
               </View>
             ) : null}
             {items.map((item) => (
@@ -252,6 +270,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         visible={stickerOpen}
         colors={colors}
         onClose={() => setStickerOpen(false)}
+        onPaste={pasteSticker}
         onPick={(content, aspect) => {
           spawn({ kind: 'sticker', content, color: penColor, aspect });
           setStickerOpen(false);

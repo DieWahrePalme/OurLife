@@ -36,7 +36,7 @@ export function useUndoDelete(
     const last = pending.current;
     pending.current = null;
     setDeleted(null);
-    if (last && last.item.kind === 'photo' && isCloudPhoto(last.item.content)) deletePhoto(last.item.content);
+    if (last && isCloudPhoto(last.item.content)) deletePhoto(last.item.content);
   }, []);
 
   const deleteItem = useCallback(
