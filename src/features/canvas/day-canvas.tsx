@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CanvasItemView } from './canvas-item';
-import { uploadPhoto } from './photo-cloud';
+import { isCloudPhoto } from './photo-cloud';
 import { pasteClipboardImage, pickPhoto } from './photos';
 import { MoodSheet } from './mood-sheet';
 import { StickerSheet } from './sticker-sheet';
@@ -19,7 +19,6 @@ import { strings } from '@/constants/strings';
 import { commandText, isGoalCommand, parseGoalCommand } from '@/features/goals/command';
 import { useSettingsStore } from '@/features/settings/settings-store';
 import { useGoalsStore } from '@/features/goals/goals-store';
-import { getSpaceId } from '@/features/sync/context';
 
 interface DayCanvasProps {
   dayNumber: number;
@@ -31,7 +30,7 @@ const SPAWN_SPREAD = 60;
 const SPAWN_MARGIN = 8;
 const DEFAULT_SPAWN_WIDTH = 120;
 /** Rough on-page width of each item kind, so wide items start inside the page instead of off its edge. */
-const SPAWN_WIDTH: Partial<Record<CanvasItem['kind'], number>> = { photo: 216, todo: 210, focus: 210, tape: 120 };
+const SPAWN_WIDTH: Partial<Record<CanvasItem['kind'], number>> = { photo: 216, todo: 222, focus: 222, tape: 120, text: 300 };
 
 function spawnX(kind: CanvasItem['kind'], pageWidth: number, jitter: number): number {
   const width = SPAWN_WIDTH[kind] ?? DEFAULT_SPAWN_WIDTH;
@@ -43,10 +42,14 @@ export const PAGE_WIDTH = 360;
 export const PAGE_HEIGHT = 580;
 const MAX_PAGE_SCALE = 1.5;
 const PAGE_PADDING = 12;
+/** Height kept free under the page for the one-line status text, so the page never jumps when it appears. */
+const STATUS_ROOM = 24;
+const DUPLICATE_OFFSET = 18;
 const SPAWN_ROWS = 6;
 const SPAWN_ROW_HEIGHT = 90;
 /** A tap on an item also reaches the page underneath (on web); ignore that page tap. */
 const SELECT_GRACE_MS = 300;
+const EDIT_KINDS: readonly CanvasItem['kind'][] = ['text', 'todo', 'focus', 'goal'];
 const RECOLOR_KINDS: readonly CanvasItem['kind'][] = ['text', 'tape', 'todo', 'focus', 'goal'];
 
 type EditableKind = 'text' | 'todo' | 'focus';
@@ -60,21 +63,27 @@ function tasksFromText(text: string, previous: readonly Task[] = []): Task[] {
     .map((line) => ({ text: line, done: previous.some((t) => t.text === line && t.done) }));
 }
 
+/** A picture file is shared by one item only: a copy would lose its file when the original is deleted. */
+function canDuplicate(item: CanvasItem): boolean {
+  if (item.kind === 'photo') return false;
+  return !(item.kind === 'sticker' && (isCloudPhoto(item.content) || /^(file|data|blob):/i.test(item.content)));
+}
+
 function newId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
-  const { items, canEdit, error, add, update, remove, restore, bringToFront } = useDayItems(dayNumber);
+  const { items, canEdit, error, add, update, remove, restore, bringToFront, sendToBack } = useDayItems(dayNumber);
   const { deleted, deleteItem, undo } = useUndoDelete(items, remove, restore);
-  usePhotoResync(items, canEdit, update);
+  const photoSync = usePhotoResync(items, canEdit, update);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const lastSelectAt = useRef(0);
   const [available, setAvailable] = useState({ width: 0, height: 0 });
   const pageScale = Math.min(
     MAX_PAGE_SCALE,
     Math.max((available.width - PAGE_PADDING * 2) / PAGE_WIDTH, 0),
-    Math.max((available.height - PAGE_PADDING * 2) / PAGE_HEIGHT, 0),
+    Math.max((available.height - PAGE_PADDING * 2 - STATUS_ROOM) / PAGE_HEIGHT, 0),
   );
   const penColor = useSettingsStore((state) => state.penColor);
   const goals = useGoalsStore((state) => state.goals);
@@ -88,7 +97,15 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     loadGoals();
   }, [loadGoals]);
 
-  const selected = items.find((it) => it.id === selectedId) ?? null;
+  const selected = items.find((it) => it.id === selectedId && it.locked !== true) ?? null;
+
+  const status = ((): { text: string; isProblem: boolean } | null => {
+    if (error) return { text: error, isProblem: true };
+    if (photoError) return { text: photoError, isProblem: true };
+    if (photoSync.failure !== null) return { text: strings.photoNotShared(photoSync.failure), isProblem: true };
+    if (photoSync.sharing > 0) return { text: strings.photoSharing, isProblem: false };
+    return null;
+  })();
 
   const spawn = useCallback(
     (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect' | 'tasks' | 'amount'> & Partial<Pick<CanvasItem, 'id'>>) => {
@@ -107,21 +124,14 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     [add, items.length],
   );
 
+  /** Shown at once from the local copy; `usePhotoResync` sends it to the cloud and swaps in the shared copy. */
   const addPhoto = async () => {
     setPhotoError(null);
     try {
       const id = newId();
       const photo = await pickPhoto(id);
       if (!photo) return;
-      // Shown at once from the local copy; the cloud copy replaces it when the upload is done.
       spawn({ id, kind: 'photo', content: photo.uri, color: penColor, aspect: photo.aspect });
-      const spaceId = getSpaceId();
-      if (!spaceId) return;
-      try {
-        update(id, { content: await uploadPhoto(spaceId, id, photo.uri) });
-      } catch {
-        setPhotoError(strings.photoNotShared);
-      }
     } catch {
       setPhotoError(strings.photoFailed);
     }
@@ -135,14 +145,23 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
       if (!image) return strings.pasteEmpty;
       spawn({ id, kind: 'sticker', content: image.uri, color: penColor, aspect: image.aspect });
       setStickerOpen(false);
-      const spaceId = getSpaceId();
-      if (spaceId) {
-        update(id, { content: await uploadPhoto(spaceId, id, image.uri) });
-      }
       return null;
     } catch {
       return strings.pasteFailed;
     }
+  };
+
+  const lockSelected = () => {
+    if (!selected) return;
+    update(selected.id, { locked: true });
+    setSelectedId(null);
+  };
+
+  const duplicateSelected = () => {
+    if (!selected || !canDuplicate(selected)) return;
+    const copy: CanvasItem = { ...selected, id: newId(), x: selected.x + DUPLICATE_OFFSET, y: selected.y + DUPLICATE_OFFSET, locked: false };
+    add(copy);
+    setSelectedId(copy.id);
   };
 
   const editedItem = editor?.mode === 'edit' ? (items.find((it) => it.id === editor.id) ?? null) : null;
@@ -222,9 +241,9 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
           </Pressable>
         </View>
         {deleted ? <UndoBar colors={colors} onUndo={undo} /> : null}
-        {error ?? photoError ? (
-          <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.danger }]}>
-            {error ?? photoError}
+        {status ? (
+          <Text accessibilityLiveRegion="polite" numberOfLines={2} style={[styles.status, { color: status.isProblem ? colors.danger : colors.inkSoft }]}>
+            {status.text}
           </Text>
         ) : null}
       </View>
@@ -233,6 +252,9 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         colors={colors}
         selectedColor={selected?.color ?? null}
         canRecolor={selected !== null && RECOLOR_KINDS.includes(selected.kind)}
+        canDuplicate={selected !== null && canDuplicate(selected)}
+        canEditText={selected !== null && EDIT_KINDS.includes(selected.kind)}
+        onEdit={() => selected && setEditor({ mode: 'edit', id: selected.id })}
         onAddText={() => setEditor({ mode: 'new', kind: 'text' })}
         onAddTodo={() => setEditor({ mode: 'new', kind: 'todo' })}
         onAddFocus={() => setEditor({ mode: 'new', kind: 'focus' })}
@@ -242,6 +264,9 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
         onAddTape={() => spawn({ kind: 'tape', content: '', color: TAPE_COLORS[Math.floor(Math.random() * TAPE_COLORS.length)] })}
         onPickColor={(color) => selected && update(selected.id, { color })}
         onToFront={() => selected && bringToFront(selected.id)}
+        onToBack={() => selected && sendToBack(selected.id)}
+        onLock={lockSelected}
+        onDuplicate={duplicateSelected}
         onDelete={() => {
           if (selected) removeItem(selected.id);
         }}
@@ -291,7 +316,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     transformOrigin: 'top left',
   },
-  error: { textAlign: 'center', paddingTop: 6, fontSize: 13 },
+  status: { position: 'absolute', left: PAGE_PADDING, right: PAGE_PADDING, bottom: 2, textAlign: 'center', fontSize: 12, lineHeight: 15 },
   emptyHint: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyHintText: { fontFamily: 'Caveat_700Bold', fontSize: 32, lineHeight: 44, textAlign: 'center' },
 });

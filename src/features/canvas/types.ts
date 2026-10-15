@@ -23,6 +23,10 @@ export interface CanvasItem {
   tasks?: Task[];
   /** Change to a goal (kind "goal"); content holds the goal id. */
   amount?: number;
+  /** Box width in page pixels at scale 1, for text, focus and to-do blocks. Missing = automatic. */
+  width?: number;
+  /** A locked item ignores touches, so items on top of or under it can be moved freely. Shared with the other phone. */
+  locked?: boolean;
 }
 
 export const ITEM_KINDS: readonly ItemKind[] = ['text', 'sticker', 'tape', 'photo', 'todo', 'focus', 'mood', 'goal'];
@@ -32,3 +36,7 @@ export const DEFAULT_PEN_COLOR = PEN_COLORS[0];
 
 export const MIN_SCALE = 0.4;
 export const MAX_SCALE = 4;
+
+/** Width limits of a text box (page pixels at scale 1). */
+export const MIN_BOX_WIDTH = 70;
+export const MAX_BOX_WIDTH = 340;

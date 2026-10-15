@@ -1,4 +1,6 @@
+import { File } from 'expo-file-system';
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 
@@ -36,24 +38,63 @@ function isAlreadyThere(error: { message?: string; statusCode?: string }): boole
   return error.statusCode === '409' || /already exists/i.test(error.message ?? '');
 }
 
-/** Uploads a local image to `path` in the private bucket. Returns the reference to store in an item. */
-export async function uploadImage(path: string, localUri: string): Promise<string> {
+/** The file this phone is meant to upload is not here (it was added on another phone). Not worth retrying. */
+export class MissingLocalFileError extends Error {
+  constructor() {
+    super('The picture file is not on this phone');
+    this.name = 'MissingLocalFileError';
+  }
+}
+
+const TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+};
+
+interface LocalImage {
+  body: ArrayBuffer | Blob;
+  type: string;
+}
+
+/**
+ * Reads a local image. On a phone the bytes come straight from the file: `fetch(file://).blob()` is unreliable in
+ * React Native (empty type, empty upload), so the type comes from the file extension instead.
+ */
+async function readLocalImage(localUri: string): Promise<LocalImage> {
+  if (Platform.OS !== 'web' && /^file:/i.test(localUri)) {
+    const file = new File(localUri);
+    if (!file.exists) throw new MissingLocalFileError();
+    const type = TYPE_BY_EXTENSION[file.extension.replace('.', '').toLowerCase()] ?? '';
+    return { body: await file.arrayBuffer(), type };
+  }
+  // A browser address (blob:, data:) from another session cannot be read here any more.
+  const response = await fetch(localUri).catch(() => null);
+  if (!response?.ok) throw new MissingLocalFileError();
+  const blob = await response.blob();
+  return { body: blob, type: blob.type };
+}
+
+/**
+ * Uploads a local image to `<space_id>/<item_id>.<ext>` in the private bucket.
+ * Returns the reference to store in the item.
+ */
+export async function uploadPhoto(spaceId: string, itemId: string, localUri: string): Promise<string> {
   if (!supabase) throw new Error('Cloud is not configured');
-  const blob = await (await fetch(localUri)).blob();
-  if (!EXTENSION_BY_TYPE[blob.type]) throw new Error('This image type is not supported');
-  if (blob.size > MAX_BYTES) throw new Error('This image is too large (10 MB at most)');
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, upsert: false });
+  const { body, type } = await readLocalImage(localUri);
+  const extension = EXTENSION_BY_TYPE[type];
+  if (!extension) throw new Error('This image type is not supported');
+  const size = body instanceof Blob ? body.size : body.byteLength;
+  if (size === 0) throw new Error('The picture file is empty');
+  if (size > MAX_BYTES) throw new Error('This image is too large (10 MB at most)');
+  const path = `${spaceId}/${itemId}.${extension}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, body, { contentType: type, upsert: false });
   // The same item uploaded before (an earlier try got through, the answer was lost): the file is already there.
   if (error && !isAlreadyThere(error)) throw error;
   return cloudRef(path);
-}
-
-/** Uploads a picked photo to `<space_id>/<item_id>.<ext>`. Returns the reference to store in the item. */
-export async function uploadPhoto(spaceId: string, itemId: string, localUri: string): Promise<string> {
-  const blob = await (await fetch(localUri)).blob();
-  const extension = EXTENSION_BY_TYPE[blob.type];
-  if (!extension) throw new Error('This photo type is not supported');
-  return uploadImage(`${spaceId}/${itemId}.${extension}`, localUri);
 }
 
 /** Best effort: a photo left behind in the bucket is harmless, so failures are ignored. */

@@ -19,6 +19,8 @@ export function isCanvasItem(value: unknown): value is CanvasItem {
     (v.tasks === undefined || (Array.isArray(v.tasks) && v.tasks.every(isTask))) &&
     (v.aspect === undefined || typeof v.aspect === 'number') &&
     (v.amount === undefined || typeof v.amount === 'number') &&
+    (v.width === undefined || typeof v.width === 'number') &&
+    (v.locked === undefined || typeof v.locked === 'boolean') &&
     typeof v.x === 'number' &&
     typeof v.y === 'number' &&
     typeof v.scale === 'number' &&

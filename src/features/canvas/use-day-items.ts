@@ -26,6 +26,7 @@ interface DayItems {
   /** Puts a removed item back at its old place in the stacking order. */
   restore: (item: CanvasItem, index: number) => void;
   bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
 }
 
 export function useDayItems(dayNumber: number): DayItems {
@@ -211,5 +212,14 @@ export function useDayItems(dayNumber: number): DayItems {
     [],
   );
 
-  return { items, canEdit, error, add, update, remove, restore, bringToFront };
+  const sendToBack = useCallback(
+    (id: string) =>
+      setItems((prev) => {
+        const target = prev.find((it) => it.id === id);
+        return target ? [target, ...prev.filter((it) => it.id !== id)] : prev;
+      }),
+    [],
+  );
+
+  return { items, canEdit, error, add, update, remove, restore, bringToFront, sendToBack };
 }

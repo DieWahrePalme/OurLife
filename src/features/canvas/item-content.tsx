@@ -1,4 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatAmount } from '@/features/goals/command';
@@ -14,47 +16,102 @@ const TAPE_WIDTH = 120;
 const TAPE_HEIGHT = 34;
 const STICKER_SIZE = 56;
 const IMAGE_STICKER_SIZE = 140;
-const CARD_WIDTH = 210;
+export const CARD_WIDTH = 210;
+export const TEXT_MAX_WIDTH = 260;
+/** Handwriting fonts draw their last letter past the measured width; this room keeps it from being cut off. */
+const GLYPH_ROOM = 8;
 const INK = '#2E2B3A';
+
+/**
+ * Everything is drawn at its final size (base size times `zoom`) instead of being stretched with a transform,
+ * so text and pictures stay sharp when an item is enlarged.
+ */
+function makeStyles(zoom: number) {
+  const z = (value: number) => value * zoom;
+  return StyleSheet.create({
+    sticker: { fontSize: z(STICKER_SIZE), lineHeight: z(STICKER_SIZE * 1.25), paddingRight: z(4) },
+    tape: { width: z(TAPE_WIDTH), height: z(TAPE_HEIGHT), opacity: 0.8, borderRadius: 2 },
+    polaroid: { backgroundColor: '#fff', padding: z(8), paddingBottom: z(22), borderRadius: z(3), shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: z(6), shadowOffset: { width: 0, height: z(3) }, elevation: 3 },
+    missing: { alignItems: 'center', justifyContent: 'center', gap: z(6), backgroundColor: '#EFEAE4' },
+    missingText: { fontSize: z(12), color: '#6F6A7A', textAlign: 'center', paddingHorizontal: z(8) },
+    mood: { flexDirection: 'row', alignItems: 'center', gap: z(8), paddingVertical: z(6), paddingLeft: z(14), paddingRight: z(14) + GLYPH_ROOM * zoom, borderRadius: 999 },
+    moodFace: { fontSize: z(26) },
+    moodLabel: { fontFamily: 'Caveat_700Bold', fontSize: z(26), lineHeight: z(38), color: INK },
+    goalChip: { flexDirection: 'row', alignItems: 'center', gap: z(10), paddingVertical: z(4), paddingLeft: z(14), paddingRight: z(14) + GLYPH_ROOM * zoom, borderRadius: 999, borderWidth: 2, backgroundColor: '#FFFFFF' },
+    goalName: { fontFamily: 'Caveat_700Bold', fontSize: z(26), lineHeight: z(36), color: INK },
+    goalAmount: { fontSize: z(16), fontWeight: '700' },
+    card: { backgroundColor: '#FFFFFF', borderWidth: 2, borderRadius: z(12), padding: z(12), gap: z(4) },
+    cardTitle: { fontFamily: 'Caveat_700Bold', fontSize: z(28), lineHeight: z(38), paddingRight: z(GLYPH_ROOM) },
+    focusText: { fontFamily: 'Caveat_700Bold', fontSize: z(24), lineHeight: z(34), color: INK, paddingRight: z(GLYPH_ROOM) },
+    taskRow: { flexDirection: 'row', alignItems: 'center', gap: z(10), minHeight: z(44) },
+    box: { width: z(22), height: z(22), borderRadius: z(6), borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+    check: { color: '#fff', fontSize: z(14), fontWeight: '700' },
+    taskText: { flex: 1, fontFamily: 'Caveat_700Bold', fontSize: z(22), lineHeight: z(30), color: INK, paddingRight: z(GLYPH_ROOM) },
+    taskDone: { textDecorationLine: 'line-through', opacity: 0.55 },
+    text: { fontFamily: 'Caveat_700Bold', fontSize: z(30), lineHeight: z(42), paddingRight: z(GLYPH_ROOM) },
+  });
+}
+
+type Styles = ReturnType<typeof makeStyles>;
 
 interface ItemContentProps {
   item: CanvasItem;
+  /** Enlargement of the item; layout is done at this size. */
+  zoom: number;
   onChange: (id: string, patch: Partial<CanvasItem>) => void;
 }
 
-function GoalChip({ item }: { item: CanvasItem }) {
+interface PartProps {
+  item: CanvasItem;
+  zoom: number;
+  s: Styles;
+}
+
+function GoalChip({ item, s }: PartProps) {
   const goal = useGoalsStore((state) => state.goals.find((g) => g.id === item.content));
   const amount = item.amount ?? 0;
   return (
-    <View style={[styles.goalChip, { borderColor: item.color }]}>
-      <Text style={styles.goalName}>{goal ? goal.name : 'Deleted goal'}</Text>
-      <Text style={[styles.goalAmount, { color: amount < 0 ? '#C0463A' : '#2F9E6F' }]}>
+    <View style={[s.goalChip, { borderColor: item.color }]}>
+      <Text style={s.goalName}>{goal ? goal.name : 'Deleted goal'}</Text>
+      <Text style={[s.goalAmount, { color: amount < 0 ? '#C0463A' : '#2F9E6F' }]}>
         {formatAmount(amount, goal?.unit ?? '')}
       </Text>
     </View>
   );
 }
 
-function PhotoContent({ item }: { item: CanvasItem }) {
+function PhotoContent({ item, zoom, s }: PartProps) {
   const uri = usePhotoUri(item.content);
+  const [failed, setFailed] = useState(false);
+  const imageStyle = { width: PHOTO_WIDTH * zoom, aspectRatio: item.aspect ?? 1 };
+  // A picture whose file only lives on the other phone (not shared yet) has nothing to show here.
+  const missing = failed || (uri === null && !isCloudPhoto(item.content));
   return (
-    <View style={styles.polaroid}>
-      <Image
-        source={uri ? { uri } : undefined}
-        style={{ width: PHOTO_WIDTH, aspectRatio: item.aspect ?? 1 }}
-        contentFit="cover"
-        accessibilityLabel={strings.photoLabel}
-      />
+    <View style={s.polaroid}>
+      {missing ? (
+        <View style={[imageStyle, s.missing]}>
+          <Ionicons name="cloud-offline-outline" size={28 * zoom} color="#6F6A7A" />
+          <Text style={s.missingText}>{strings.photoNotThereYet}</Text>
+        </View>
+      ) : (
+        <Image
+          source={uri ? { uri } : undefined}
+          style={imageStyle}
+          contentFit="cover"
+          onError={() => setFailed(true)}
+          accessibilityLabel={strings.photoLabel}
+        />
+      )}
     </View>
   );
 }
 
 /** A sticker or GIF from the library. Only KLIPY's own address is loaded, whatever a synced item says. */
-function ImageSticker({ item }: { item: CanvasItem }) {
+function ImageSticker({ item, zoom }: PartProps) {
   return (
     <Image
       source={isKlipyUrl(item.content) ? { uri: item.content } : undefined}
-      style={{ width: IMAGE_STICKER_SIZE, aspectRatio: item.aspect ?? 1 }}
+      style={{ width: IMAGE_STICKER_SIZE * zoom, aspectRatio: item.aspect ?? 1 }}
       contentFit="contain"
       accessibilityLabel={strings.stickerLabel}
     />
@@ -62,51 +119,53 @@ function ImageSticker({ item }: { item: CanvasItem }) {
 }
 
 /** A sticker pasted from the clipboard: a picture in the cloud (or still a file on this phone), no frame. */
-function PastedSticker({ item }: { item: CanvasItem }) {
+function PastedSticker({ item, zoom }: PartProps) {
   const uri = usePhotoUri(item.content);
   return (
     <Image
       source={uri ? { uri } : undefined}
-      style={{ width: IMAGE_STICKER_SIZE, aspectRatio: item.aspect ?? 1 }}
+      style={{ width: IMAGE_STICKER_SIZE * zoom, aspectRatio: item.aspect ?? 1 }}
       contentFit="contain"
       accessibilityLabel={strings.stickerLabel}
     />
   );
 }
 
-export function ItemContent({ item, onChange }: ItemContentProps) {
+export function ItemContent({ item, zoom, onChange }: ItemContentProps) {
+  const s = useMemo(() => makeStyles(zoom), [zoom]);
+  const part = { item, zoom, s };
   switch (item.kind) {
     case 'sticker':
-      if (isKlipyUrl(item.content)) return <ImageSticker item={item} />;
-      if (isCloudPhoto(item.content) || /^(file|data|blob):/i.test(item.content)) return <PastedSticker item={item} />;
-      return <Text style={styles.sticker}>{item.content}</Text>;
+      if (isKlipyUrl(item.content)) return <ImageSticker {...part} />;
+      if (isCloudPhoto(item.content) || /^(file|data|blob):/i.test(item.content)) return <PastedSticker {...part} />;
+      return <Text style={s.sticker}>{item.content}</Text>;
     case 'tape':
-      return <View style={[styles.tape, { backgroundColor: item.color }]} />;
+      return <View style={[s.tape, { backgroundColor: item.color }]} />;
     case 'photo':
-      return <PhotoContent item={item} />;
+      return <PhotoContent {...part} />;
     case 'goal':
-      return <GoalChip item={item} />;
+      return <GoalChip {...part} />;
     case 'mood': {
       const mood = moodFor(item.content);
       return (
-        <View style={[styles.mood, { backgroundColor: mood.color }]}>
-          <Text style={styles.moodFace}>{mood.face}</Text>
-          <Text style={styles.moodLabel}>{mood.label}</Text>
+        <View style={[s.mood, { backgroundColor: mood.color }]}>
+          <Text style={s.moodFace}>{mood.face}</Text>
+          <Text style={s.moodLabel}>{mood.label}</Text>
         </View>
       );
     }
     case 'focus':
       return (
-        <View style={[styles.card, { borderColor: item.color }]}>
-          <Text style={[styles.cardTitle, { color: item.color }]}>{strings.focusTitle}</Text>
-          <Text style={styles.focusText}>{item.content}</Text>
+        <View style={[s.card, { borderColor: item.color, width: (item.width ?? CARD_WIDTH) * zoom }]}>
+          <Text style={[s.cardTitle, { color: item.color }]}>{strings.focusTitle}</Text>
+          <Text style={s.focusText}>{item.content}</Text>
         </View>
       );
     case 'todo': {
       const tasks = item.tasks ?? [];
       return (
-        <View style={[styles.card, { borderColor: item.color }]}>
-          <Text style={[styles.cardTitle, { color: item.color }]}>{strings.todoTitle}</Text>
+        <View style={[s.card, { borderColor: item.color, width: (item.width ?? CARD_WIDTH) * zoom }]}>
+          <Text style={[s.cardTitle, { color: item.color }]}>{strings.todoTitle}</Text>
           {tasks.map((task, index) => (
             <Pressable
               key={`${index}-${task.text}`}
@@ -116,39 +175,22 @@ export function ItemContent({ item, onChange }: ItemContentProps) {
               onPress={() =>
                 onChange(item.id, { tasks: tasks.map((t, i) => (i === index ? { ...t, done: !t.done } : t)) })
               }
-              style={styles.taskRow}
+              style={s.taskRow}
             >
-              <View style={[styles.box, { borderColor: item.color, backgroundColor: task.done ? item.color : 'transparent' }]}>
-                {task.done ? <Text style={styles.check}>✓</Text> : null}
+              <View style={[s.box, { borderColor: item.color, backgroundColor: task.done ? item.color : 'transparent' }]}>
+                {task.done ? <Text style={s.check}>✓</Text> : null}
               </View>
-              <Text style={[styles.taskText, task.done && styles.taskDone]}>{task.text}</Text>
+              <Text style={[s.taskText, task.done && s.taskDone]}>{task.text}</Text>
             </Pressable>
           ))}
         </View>
       );
     }
     default:
-      return <Text style={[styles.text, { color: item.color }]}>{item.content}</Text>;
+      return (
+        <Text style={[s.text, { color: item.color }, item.width ? { width: item.width * zoom } : { maxWidth: TEXT_MAX_WIDTH * zoom }]}>
+          {item.content}
+        </Text>
+      );
   }
 }
-
-const styles = StyleSheet.create({
-  sticker: { fontSize: STICKER_SIZE },
-  text: { fontFamily: 'Caveat_700Bold', fontSize: 30, lineHeight: 42, maxWidth: 260 },
-  tape: { width: TAPE_WIDTH, height: TAPE_HEIGHT, opacity: 0.8, borderRadius: 2 },
-  polaroid: { backgroundColor: '#fff', padding: 8, paddingBottom: 22, borderRadius: 3, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
-  mood: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999 },
-  moodFace: { fontSize: 26 },
-  moodLabel: { fontFamily: 'Caveat_700Bold', fontSize: 26, lineHeight: 38, color: INK },
-  goalChip: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, paddingHorizontal: 14, borderRadius: 999, borderWidth: 2, backgroundColor: '#FFFFFF' },
-  goalName: { fontFamily: 'Caveat_700Bold', fontSize: 26, lineHeight: 36, color: INK },
-  goalAmount: { fontSize: 16, fontWeight: '700' },
-  card: { width: CARD_WIDTH, backgroundColor: '#FFFFFF', borderWidth: 2, borderRadius: 12, padding: 12, gap: 4 },
-  cardTitle: { fontFamily: 'Caveat_700Bold', fontSize: 28, lineHeight: 38 },
-  focusText: { fontFamily: 'Caveat_700Bold', fontSize: 24, lineHeight: 34, color: INK },
-  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
-  box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  check: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  taskText: { flex: 1, fontFamily: 'Caveat_700Bold', fontSize: 22, lineHeight: 30, color: INK },
-  taskDone: { textDecorationLine: 'line-through', opacity: 0.55 },
-});

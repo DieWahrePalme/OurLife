@@ -1,5 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { Directory, File, Paths } from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
@@ -10,7 +11,11 @@ export interface PickedPhoto {
 }
 
 const PHOTO_DIR = 'photos';
-const PICK_QUALITY = 0.8;
+/** The picker hands over the original; one controlled re-encode below keeps pictures sharp and uploads small. */
+const PICK_QUALITY = 1;
+/** Long edge in pixels: still sharp when an item is enlarged 4x on the page, and a few hundred KB to upload. */
+const MAX_EDGE = 1600;
+const JPEG_QUALITY = 0.85;
 const FALLBACK_EXTENSION = 'jpg';
 
 function extensionOf(uri: string): string {
@@ -28,13 +33,35 @@ async function keepPhoto(sourceUri: string, id: string): Promise<string> {
   return target.uri;
 }
 
+/**
+ * Applies the camera rotation and shrinks big pictures (JPEG, or PNG so cut-outs keep their transparency).
+ * GIFs stay untouched so they keep moving. If anything goes wrong the original is used.
+ */
+async function prepareImage(uri: string, width: number, height: number): Promise<PickedPhoto & { uri: string }> {
+  const original = { uri, aspect: width > 0 && height > 0 ? width / height : 1 };
+  const extension = extensionOf(uri);
+  if (extension === 'gif') return original;
+  try {
+    const resize = width >= height ? { width: MAX_EDGE } : { height: MAX_EDGE };
+    const keepPng = extension === 'png';
+    const result = await ImageManipulator.manipulateAsync(uri, Math.max(width, height) > MAX_EDGE ? [{ resize }] : [], {
+      compress: keepPng ? 1 : JPEG_QUALITY,
+      format: keepPng ? ImageManipulator.SaveFormat.PNG : ImageManipulator.SaveFormat.JPEG,
+    });
+    return { uri: result.uri, aspect: result.width > 0 && result.height > 0 ? result.width / result.height : original.aspect };
+  } catch {
+    return original;
+  }
+}
+
 /** Opens the photo library. Returns null if the person cancels. Throws if the photo cannot be saved. */
 export async function pickPhoto(id: string): Promise<PickedPhoto | null> {
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: PICK_QUALITY });
   if (result.canceled || result.assets.length === 0) return null;
   const asset = result.assets[0];
-  const uri = await keepPhoto(asset.uri, id);
-  return { uri, aspect: asset.width > 0 && asset.height > 0 ? asset.width / asset.height : 1 };
+  const prepared = await prepareImage(asset.uri, asset.width, asset.height);
+  const uri = await keepPhoto(prepared.uri, id);
+  return { uri, aspect: prepared.aspect };
 }
 
 const DATA_URI_PREFIX = /^data:image\/png;base64,/;

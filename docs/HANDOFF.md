@@ -15,6 +15,39 @@ commit was still running when this was written, check `gh run list --limit 1`.**
 **Checked on phones (2026-10-12, Moritz):** the skins look good, the paste-sticker button works, and the app now also loads on
 his girlfriend's phone. Still open from the skin review: pattern strength / more skins (see "What is next").
 
+## Session 2026-10-15 (day page overhaul, **not committed, not checked on a phone yet**)
+
+Moritz's report (4 screenshots, day 366 to 369): photos are not shared between the two phones, pictures are blurry, text
+boxes cannot be resized without the letters changing size, the last letter of notes and bubbles is cut off ("unproduktiv",
+"Stressed"), stacked items grab the wrong one, wish for a lock and a nicer, easier day page.
+
+- **Photo sharing**: the upload read the file with `fetch(file://).blob()`, which is unreliable in Expo Go on iOS. Now the bytes
+  come from `expo-file-system` (`File.arrayBuffer()`) and the type from the file extension (`photo-cloud.ts`). Adding a photo
+  only puts it on the page; **one** path (`use-photo-resync.ts`) uploads it, retries every 15 s and returns `{ sharing, failure }`.
+  The status line under the page shows "Sharing photo…" or "Photo not shared yet, trying again (<real reason>)". **If it still
+  fails on the phone, the reason in that line is the next clue.** A photo whose file only exists on the other phone shows a
+  "Photo not shared yet" placeholder instead of a white box. Photos added before this fix that exist only on one phone are
+  uploaded when that phone opens the day (their files must still be on it).
+- **Sharper pictures**: new dependency `expo-image-manipulator`. Photos are re-encoded once (long edge 1600 px, JPEG 0.85, PNG
+  stays PNG, GIF untouched). Items are no longer stretched with a transform: everything is drawn at its real size
+  (`item-content.tsx` `makeStyles(zoom)`), so text and pictures stay sharp when enlarged. `item.scale` still means the same, old
+  pages keep their positions (`canvas-item.tsx` `shiftX/shiftY`).
+- **Text boxes**: selected text / focus / to-do get a blue side handle (changes the width, letters keep their size, text wraps
+  again; new item field `width`) and every item gets a round corner handle (resize, top-left corner stays). Pinch and twist still work.
+- **Cut-off letters**: handwriting text, mood and goal bubbles now have room for the last glyph (`GLYPH_ROOM`).
+  Text starts inside the page (it used to start so far right that long notes ran out of the page).
+- **Lock** (shared with the other phone, item field `locked`): toolbar button "Lock". A locked item ignores touches completely
+  (items under and over it can be moved freely); a small padlock on it unlocks with one tap.
+- **Toolbar when an item is selected**: Color (opens the colour row), Edit (text, to-do, focus, goal), Lock, Copy (not for
+  photos or pasted stickers, they own a file), Front, Back, Delete.
+- Other phone's moves now show live (the animated values follow the saved item, `use-item-motion.ts`; before, only a reopen did).
+- The status / error line no longer pushes the page up over the date.
+- Not done yet, ideas: page backgrounds (lined, dotted), snapping guides, text alignment / font choice, photo frame choice,
+  multi-select, undo for moves.
+- Checked in the browser (Playwright, local mode, no cloud): add text, width handle, corner handle, lock (a locked item does not move),
+  colour row, mood bubble. **Not checkable there:** the real upload, blur on iOS, gestures with fingers. Please test on the phone:
+  add a photo on one phone, open the day on the other; enlarge a photo and a note; lock a photo and drag a sticker over it.
+
 ## What works today
 
 Runs in Expo Go, in a browser and on GitHub Pages. Phones share one space and sync live.
@@ -167,6 +200,42 @@ only in the session scratchpad and is gone; `supabase/verify-live.sql` is kept i
 ## What is next
 
 Ideas from Moritz (2026-10-11), not started:
+
+**New items from Moritz, 2026-10-12 (via the boss session). Not started; ask Moritz which one first. Suggested order: A, A2 (both bugs), then B.**
+
+A. **Bug: the goals page is hard to use with more than 3 goals.** (Not reproduced on a phone yet; cause below is from reading the code.)
+   - Findings in `src/app/goals/index.tsx` and `src/features/goals/new-goal-form.tsx`: the "New goal" form sits at the *bottom* of
+     one `ScrollView` under the list of goal cards. With 1 to 3 goals it is still on screen; with 4 or more it is below the fold.
+     The `ScrollView` has no keyboard handling at all (no `KeyboardAvoidingView`, no `automaticallyAdjustKeyboardInsets`, no
+     `keyboardShouldPersistTaps="handled"`). Likely effect on the iPhone: the keyboard covers the lower fields and the "Create
+     goal" button, the decimal keyboard for the target has no Return key, and the first tap on the button only closes the keyboard.
+     There is no "edit goal" form at all (`src/app/goals/[id].tsx` only shows progress), so "edit" in the report probably means
+     adding.
+   - To confirm before fixing: add 4+ goals in Expo Go, tap the name field, and note what is covered. The web build cannot show
+     the keyboard problem (no on-screen keyboard), so it needs the phone.
+   - Proposed fix: open "New goal" as a sheet (a plain overlay like the sticker sheet, with `KeyboardAvoidingView`) from a "+"
+     button at the top of the list, so the list can grow without limit; set `keyboardShouldPersistTaps="handled"` and
+     `automaticallyAdjustKeyboardInsets` on the scroll view. Fits the planned goals-page polish (item 1b).
+A2. **Bug report: text is cut off on the day page of day 366 (the 1-year milestone).** Suggested right after A.
+   - **Not reproduced on the web build** (checked 2026-10-12 with Playwright at 390 px and 320 px wide, Original and Scrapbook skins,
+     day 366, 100 and 12, with a long text item): the title "Day 366", the date line and a long note all fit and wrap normally.
+   - **Day 366 is not special on the day page by code:** the milestone logic (`src/lib/milestones.ts`) is only used on Home
+     (`index.tsx`, `day-grid.tsx`, `day-dot.tsx`); `src/app/day/[n].tsx` and `day-canvas.tsx` treat every day number the same.
+     The only clipping on the page is `overflow: 'hidden'` on the 360 x 580 page (`day-canvas.tsx`): an item placed or dragged
+     partly outside the page is cut off, and text has `maxWidth: 260` (`item-content.tsx`).
+   - **Needs from Moritz:** a screenshot (or where exactly: the "Day 366" title, the date, a note, or something on the Home dot
+     "1y"?) and whether it is Expo Go on the iPhone. Open guesses to test on the phone: Caveat title glyphs clipped by the
+     line height on iOS (an earlier "clipped title font" fix exists, History step 4), the "1y" text inside the Home dot (large
+     milestone dot, `day-dot.tsx`), or a note that sits near the page edge and is cut by the page's `overflow: 'hidden'`.
+B. **Lock items on the day page with a padlock.** A locked item cannot be moved, resized, rotated, edited or deleted by accident.
+   One lock / unlock toggle per item (item toolbar), a small padlock on the item while locked, unlock with one tap.
+   Decisions to make with Moritz:
+   - Is the lock shared with the other phone? Probably yes, stored in the item data (`locked`), since the page is shared; may
+     the other person unlock it?
+   - Can a locked item still be selected, to reach the unlock button? (Probably yes: tap selects, the toolbar shows only Unlock.)
+   - Does a locked item stay where it is in the stacking order when other items are dragged over it, or always stay behind / in front?
+   - Needs: a `locked` field in `types.ts` and the sync merge in `day-merge.ts`; gestures in `canvas-item.tsx` ignore a locked item;
+     the toolbar hides move / delete actions; the delete and undo paths respect it.
 
 1. **Skins: more looks?** Moritz said the three skins are good and paste works (2026-10-12). Possible additions: more skins he may want: retro, anime (original art only), a floral /
    romantic one, a light luxury variant; real paper textures would need own or licensed images (references in `design-refs/`
