@@ -1,4 +1,4 @@
-export type MoodKey = 'happy' | 'sad' | 'anxious' | 'angry' | 'stressed';
+export type MoodKey = 'happy' | 'sad' | 'anxious' | 'angry' | 'stressed' | 'inlove' | 'calm' | 'tired' | 'excited';
 
 export interface Mood {
   key: MoodKey;
@@ -13,6 +13,10 @@ export const MOODS: readonly Mood[] = [
   { key: 'anxious', label: 'Anxious', face: '😟', color: '#B79BE0' },
   { key: 'angry', label: 'Angry', face: '😠', color: '#E86A5E' },
   { key: 'stressed', label: 'Stressed', face: '😣', color: '#F2A15C' },
+  { key: 'inlove', label: 'In love', face: '🥰', color: '#F5A0BE' },
+  { key: 'calm', label: 'Calm', face: '😌', color: '#8ED3B5' },
+  { key: 'tired', label: 'Tired', face: '😴', color: '#A9B6CC' },
+  { key: 'excited', label: 'Excited', face: '🤩', color: '#6FD0E0' },
 ];
 
 export function moodFor(key: string): Mood {

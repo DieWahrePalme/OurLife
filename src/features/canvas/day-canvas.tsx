@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { CanvasItemView } from './canvas-item';
 import { isCloudPhoto } from './photo-cloud';
@@ -10,6 +11,8 @@ import { StickerSheet } from './sticker-sheet';
 import { TextModal } from './text-modal';
 import { Toolbar } from './toolbar';
 import { UndoBar } from './undo-bar';
+import { ZoomControls } from './zoom-controls';
+import { useCanvasView } from './use-canvas-view';
 import { useDayItems } from './use-day-items';
 import { usePhotoResync } from './use-photo-resync';
 import { useUndoDelete } from './use-undo-delete';
@@ -26,29 +29,27 @@ interface DayCanvasProps {
 }
 
 const TAPE_COLORS = [PEN_COLORS[1], PEN_COLORS[2], PEN_COLORS[4], PEN_COLORS[5]] as const;
-const SPAWN_SPREAD = 60;
 const SPAWN_MARGIN = 8;
 const DEFAULT_SPAWN_WIDTH = 120;
 /** Rough on-page width of each item kind, so wide items start inside the page instead of off its edge. */
 const SPAWN_WIDTH: Partial<Record<CanvasItem['kind'], number>> = { photo: 216, todo: 222, focus: 222, tape: 120, text: 300 };
+/** New items start around the middle of what is on screen, each one a bit further along this grid, so they do not pile up. */
+const SPAWN_STEP_X = 26;
+const SPAWN_STEP_Y = 34;
+const SPAWN_COLUMNS = 4;
+const SPAWN_ROWS = 6;
+const SPAWN_JITTER = 10;
+const SPAWN_HEIGHT = 70;
 
-function spawnX(kind: CanvasItem['kind'], pageWidth: number, jitter: number): number {
-  const width = SPAWN_WIDTH[kind] ?? DEFAULT_SPAWN_WIDTH;
-  const centred = pageWidth / 2 - width / 2 + jitter;
-  return Math.max(Math.min(centred, pageWidth - width - SPAWN_MARGIN), SPAWN_MARGIN);
-}
 /** The page has the same logical size on every device; it is scaled to fit the screen. */
 export const PAGE_WIDTH = 360;
 export const PAGE_HEIGHT = 580;
-const MAX_PAGE_SCALE = 1.5;
 const PAGE_PADDING = 12;
+const PAGE_RADIUS = 14;
 /** Height kept free under the page for the one-line status text, so the page never jumps when it appears. */
 const STATUS_ROOM = 24;
 const DUPLICATE_OFFSET = 18;
-const SPAWN_ROWS = 6;
-const SPAWN_ROW_HEIGHT = 90;
-/** A tap on an item also reaches the page underneath (on web); ignore that page tap. */
-const SELECT_GRACE_MS = 300;
+const FADE_IN_MS = 160;
 const EDIT_KINDS: readonly CanvasItem['kind'][] = ['text', 'todo', 'focus', 'goal'];
 const RECOLOR_KINDS: readonly CanvasItem['kind'][] = ['text', 'tape', 'todo', 'focus', 'goal'];
 
@@ -78,13 +79,9 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
   const { deleted, deleteItem, undo } = useUndoDelete(items, remove, restore);
   const photoSync = usePhotoResync(items, canEdit, update);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const lastSelectAt = useRef(0);
-  const [available, setAvailable] = useState({ width: 0, height: 0 });
-  const pageScale = Math.min(
-    MAX_PAGE_SCALE,
-    Math.max((available.width - PAGE_PADDING * 2) / PAGE_WIDTH, 0),
-    Math.max((available.height - PAGE_PADDING * 2 - STATUS_ROOM) / PAGE_HEIGHT, 0),
-  );
+  const clearSelection = useCallback(() => setSelectedId(null), []);
+  const { viewportRef, view } = useCanvasView({ pageWidth: PAGE_WIDTH, pageHeight: PAGE_HEIGHT, padding: PAGE_PADDING, bottomRoom: STATUS_ROOM, onBackgroundTap: clearSelection });
+  const { visibleCenter } = view;
   const penColor = useSettingsStore((state) => state.penColor);
   const goals = useGoalsStore((state) => state.goals);
   const loadGoals = useGoalsStore((state) => state.load);
@@ -109,11 +106,16 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
 
   const spawn = useCallback(
     (partial: Pick<CanvasItem, 'kind' | 'content' | 'color' | 'aspect' | 'tasks' | 'amount'> & Partial<Pick<CanvasItem, 'id'>>) => {
-      const jitter = () => (Math.random() - 0.5) * SPAWN_SPREAD;
+      const jitter = () => (Math.random() - 0.5) * SPAWN_JITTER * 2;
+      const width = SPAWN_WIDTH[partial.kind] ?? DEFAULT_SPAWN_WIDTH;
+      const centre = visibleCenter();
+      const slot = items.length;
+      const wantedX = centre.x - width / 2 + ((slot % SPAWN_COLUMNS) - (SPAWN_COLUMNS - 1) / 2) * SPAWN_STEP_X + jitter();
+      const wantedY = centre.y - SPAWN_HEIGHT / 2 + ((slot % SPAWN_ROWS) - (SPAWN_ROWS - 1) / 2) * SPAWN_STEP_Y + jitter();
       const item: CanvasItem = {
         id: newId(),
-        x: spawnX(partial.kind, PAGE_WIDTH, jitter()),
-        y: Math.max(PAGE_HEIGHT / 8 + (items.length % SPAWN_ROWS) * SPAWN_ROW_HEIGHT + jitter() / 3, 8),
+        x: Math.max(Math.min(wantedX, PAGE_WIDTH - width - SPAWN_MARGIN), SPAWN_MARGIN),
+        y: Math.max(Math.min(wantedY, PAGE_HEIGHT - SPAWN_HEIGHT - SPAWN_MARGIN), SPAWN_MARGIN),
         scale: 1,
         rotation: 0,
         ...partial,
@@ -121,7 +123,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
       add(item);
       setSelectedId(item.id);
     },
-    [add, items.length],
+    [add, items.length, visibleCenter],
   );
 
   /** Shown at once from the local copy; `usePhotoResync` sends it to the cloud and swaps in the shared copy. */
@@ -201,53 +203,55 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
     [deleteItem],
   );
 
-  const onSelect = useCallback((id: string) => {
-    lastSelectAt.current = Date.now();
-    setSelectedId(id);
-  }, []);
+  const onSelect = useCallback((id: string) => setSelectedId(id), []);
   const onEdit = useCallback((id: string) => setEditor({ mode: 'edit', id }), []);
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <View style={styles.pageWrap} onLayout={(e) => setAvailable(e.nativeEvent.layout)}>
-        <View style={{ width: PAGE_WIDTH * pageScale, height: PAGE_HEIGHT * pageScale, alignSelf: 'center' }}>
-          <Pressable
-            accessible={false}
-            onPress={() => {
-              if (Date.now() - lastSelectAt.current > SELECT_GRACE_MS) setSelectedId(null);
-            }}
-            style={[
-              styles.page,
-              { backgroundColor: colors.sheet, borderColor: colors.line, transform: [{ scale: pageScale }] },
-            ]}
-          >
-            {items.length === 0 && canEdit ? (
-              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.emptyHint]}>
-                <Text style={[styles.emptyHintText, { color: colors.sheetInkSoft, fontFamily: colors.fontDisplay }]}>{strings.emptyDayHint}</Text>
-              </View>
-            ) : null}
-            {items.map((item) => (
-              <CanvasItemView
-                key={item.id}
-                item={item}
-                pageScale={pageScale}
-                selected={item.id === selectedId}
-                onSelect={onSelect}
-                onEdit={onEdit}
-                onChange={update}
-                onRemove={removeItem}
-              />
-            ))}
-          </Pressable>
-        </View>
+      <View ref={viewportRef} collapsable={false} style={styles.viewport} onLayout={view.onViewportLayout}>
+        {view.ready ? (
+          <>
+            {/* Behind the page: touches that miss every item land here (zoom, move the view, deselect). */}
+            <GestureDetector gesture={view.gesture}>
+              <View collapsable={false} style={StyleSheet.absoluteFill} />
+            </GestureDetector>
+            <Animated.View
+              entering={FadeIn.duration(FADE_IN_MS)}
+              pointerEvents="box-none"
+              style={[styles.layer, { width: PAGE_WIDTH * view.renderScale, height: PAGE_HEIGHT * view.renderScale, borderRadius: PAGE_RADIUS * view.renderScale }, view.layerStyle]}
+            >
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.sheet, { backgroundColor: colors.sheet, borderColor: colors.line, borderRadius: PAGE_RADIUS * view.renderScale }]} />
+              {items.length === 0 && canEdit ? (
+                <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.emptyHint]}>
+                  <Text style={[styles.emptyHintText, { color: colors.sheetInkSoft, fontFamily: colors.fontDisplay, fontSize: 32 * view.renderScale, lineHeight: 44 * view.renderScale }]}>{strings.emptyDayHint}</Text>
+                </View>
+              ) : null}
+              {items.map((item) => (
+                <CanvasItemView
+                  key={item.id}
+                  item={item}
+                  canvasScale={view.scale}
+                  renderScale={view.renderScale}
+                  selected={item.id === selectedId}
+                  onSelect={onSelect}
+                  onEdit={onEdit}
+                  onChange={update}
+                  onRemove={removeItem}
+                />
+              ))}
+            </Animated.View>
+          </>
+        ) : null}
         {deleted ? <UndoBar colors={colors} onUndo={undo} /> : null}
         {status ? (
           <Text accessibilityLiveRegion="polite" numberOfLines={2} style={[styles.status, { color: status.isProblem ? colors.danger : colors.inkSoft }]}>
             {status.text}
           </Text>
         ) : null}
+        {view.ready ? <ZoomControls colors={colors} zoomed={view.isZoomed} onZoomIn={view.zoomIn} onZoomOut={view.zoomOut} onFit={view.zoomFit} /> : null}
       </View>
-      {canEdit ? (
+      {/* Always there, so the page does not change size when the page has loaded. */}
+      <View pointerEvents={canEdit ? 'auto' : 'none'}>
       <Toolbar
         colors={colors}
         selectedColor={selected?.color ?? null}
@@ -271,7 +275,7 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
           if (selected) removeItem(selected.id);
         }}
       />
-      ) : null}
+      </View>
       <TextModal
         key={editor ? (editor.mode === 'edit' ? editor.id : `new-${editor.kind}`) : 'closed'}
         visible={editor !== null}
@@ -307,16 +311,10 @@ export function DayCanvas({ dayNumber, colors }: DayCanvasProps) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, width: '100%' },
-  pageWrap: { flex: 1, padding: PAGE_PADDING, justifyContent: 'center' },
-  page: {
-    width: PAGE_WIDTH,
-    height: PAGE_HEIGHT,
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
-    transformOrigin: 'top left',
-  },
+  viewport: { flex: 1, overflow: 'hidden' },
+  layer: { position: 'absolute', left: 0, top: 0, overflow: 'hidden', transformOrigin: 'top left' },
+  sheet: { borderWidth: 1 },
   status: { position: 'absolute', left: PAGE_PADDING, right: PAGE_PADDING, bottom: 2, textAlign: 'center', fontSize: 12, lineHeight: 15 },
   emptyHint: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyHintText: { fontFamily: 'Caveat_700Bold', fontSize: 32, lineHeight: 44, textAlign: 'center' },
+  emptyHintText: { fontFamily: 'Caveat_700Bold', textAlign: 'center' },
 });

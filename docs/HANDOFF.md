@@ -48,6 +48,24 @@ boxes cannot be resized without the letters changing size, the last letter of no
   colour row, mood bubble. **Not checkable there:** the real upload, blur on iOS, gestures with fingers. Please test on the phone:
   add a photo on one phone, open the day on the other; enlarge a photo and a note; lock a photo and drag a sticker over it.
 
+## Session 2026-10-15, part 2 (zoomable page + boss review, **not committed**)
+
+- **Zoom like in a drawing program** (`use-canvas-view.ts`, `zoom-controls.tsx`): pinch around the fingers, drag the background to move
+  the view, double tap = jump in / out, mouse wheel on the web, buttons + / - / "whole page" in the corner. The page keeps its logical
+  size (360 x 580); up to 8x. While zooming the page is stretched, after it settles it is laid out again at the real size
+  (`renderScale`), so text and pictures stay sharp. Handles and the padlock keep their size on screen. The toolbar stays fixed at the bottom
+  (always rendered, so the page does not jump when the day has loaded; the page fades in). New items appear in the middle of what is on
+  screen, spread over a small grid (`spawn` in `day-canvas.tsx`).
+- 9 moods (added In love, Calm, Tired, Excited). Toolbar fits one row at 320 px. "Happy" / goal chip letters no longer cut.
+- Boss review: **remote move IS shown live** (re-tested 2026-10-15 with two browsers in one test space, the space was deleted again);
+  the KLIPY sticker renders fine in the current build (width ok). Not reproduced, probably an older build.
+- **Memo list (decided by Moritz, not built):** (a) a partner's delete while you edit: for now the item just stays deleted, a history /
+  notice comes later; (b) goals page: "Unit" field runs over the edge at 393 px, "New goal" form under the fold with 4+ goals, small
+  tap targets for the Settings / Goals links, copy / share button for the pairing code (not important now); (c) text cut on day 366
+  (probably fixed by the glyph room, ask Moritz); (d) idea: "partner changed something" hint and "changes not sent yet" hint;
+  (e) default sizes of new items (text looks small on a 320 px phone, zoom helps now).
+- Needs a phone check: pinch / two-finger move on the page, double tap, sharpness after zooming, handles while zoomed.
+
 ## What works today
 
 Runs in Expo Go, in a browser and on GitHub Pages. Phones share one space and sync live.

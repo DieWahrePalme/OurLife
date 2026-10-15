@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { memo, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { strings } from '@/constants/strings';
@@ -17,8 +17,10 @@ import { MAX_BOX_WIDTH, MAX_SCALE, MIN_BOX_WIDTH, MIN_SCALE, type CanvasItem, ty
 
 interface CanvasItemViewProps {
   item: CanvasItem;
-  /** Scale of the page on this screen; drags are divided by it so items follow the finger. */
-  pageScale: number;
+  /** Live scale of the page on screen (fit and zoom); drags are divided by it so items follow the finger. */
+  canvasScale: SharedValue<number>;
+  /** Scale the page is laid out at. Everything of the item is drawn this much bigger, so it stays sharp when zoomed in. */
+  renderScale: number;
   selected: boolean;
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
@@ -40,7 +42,6 @@ const DEG_PER_RAD = 180 / Math.PI;
 /** Space between an item and its dashed frame, at scale 1 (page pixels). */
 const ITEM_PADDING = 6;
 const HANDLE_SIZE = 26;
-const HANDLE_OFFSET = 14;
 const HANDLE_SLOP = 12;
 const BADGE_SIZE = 22;
 
@@ -61,9 +62,10 @@ interface Measured {
   zoom: number;
 }
 
-function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onChange, onRemove }: CanvasItemViewProps) {
+function CanvasItemViewBase({ item, canvasScale, renderScale, selected, onSelect, onEdit, onChange, onRemove }: CanvasItemViewProps) {
   const goalName = useGoalsStore((state) => state.goals.find((g) => g.id === item.content)?.name);
-  const zoom = item.scale;
+  /** Drawn size of the item compared to its base size: its own enlargement times the page's. */
+  const zoom = item.scale * renderScale;
   const locked = item.locked === true;
   const hasWidth = WIDTH_KINDS.includes(item.kind);
   const [measured, setMeasured] = useState<Measured>({ w: 0, h: 0, zoom });
@@ -82,7 +84,7 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
   const widthNow = useSharedValue(0);
 
   const commit = (nextX: number, nextY: number, nextRatio: number, nextRotationRad: number) => {
-    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, zoom * nextRatio));
+    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, item.scale * nextRatio));
     onChange(item.id, { x: nextX, y: nextY, scale: nextScale, rotation: nextRotationRad * DEG_PER_RAD });
   };
   const commitWidth = (width: number, nextX: number, nextY: number) => {
@@ -92,8 +94,8 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
 
   const showLiveWidth = (width: number) => setLive({ base: item.width, width });
 
-  const minRatio = MIN_SCALE / zoom;
-  const maxRatio = MAX_SCALE / zoom;
+  const minRatio = MIN_SCALE / item.scale;
+  const maxRatio = MAX_SCALE / item.scale;
 
   const pan = Gesture.Pan()
     .onStart(() => {
@@ -102,7 +104,7 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
       scheduleOnRN(onSelect, item.id);
     })
     .onUpdate((e) => {
-      const divisor = pageScale > 0 ? pageScale : 1;
+      const divisor = canvasScale.value > 0 ? canvasScale.value : 1;
       x.value = startX.value + e.translationX / divisor;
       y.value = startY.value + e.translationY / divisor;
     })
@@ -144,7 +146,7 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
       scheduleOnRN(onSelect, item.id);
     })
     .onUpdate((e) => {
-      const divisor = pageScale > 0 ? pageScale : 1;
+      const divisor = canvasScale.value > 0 ? canvasScale.value : 1;
       const tx = e.translationX / divisor;
       const ty = e.translationY / divisor;
       const cos = Math.cos(rotation.value);
@@ -152,14 +154,16 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
       // The finger's move along the item's own diagonal (from the middle to the bottom-right corner).
       const localX = tx * cos + ty * sin;
       const localY = -tx * sin + ty * cos;
-      const diagonal = Math.max(Math.hypot(sizeW.value, sizeH.value), 1);
-      const along = (localX * sizeW.value + localY * sizeH.value) / diagonal;
+      const widthInPage = sizeW.value / renderScale;
+      const heightInPage = sizeH.value / renderScale;
+      const diagonal = Math.max(Math.hypot(widthInPage, heightInPage), 1);
+      const along = (localX * widthInPage + localY * heightInPage) / diagonal;
       const next = Math.min(maxRatio, Math.max(minRatio, startRatio.value * (1 + along / diagonal)));
       ratio.value = next;
       // Growing happens around the middle; moving the middle by half the growth keeps the top-left corner in place.
       const grow = (next / startRatio.value - 1) / 2;
-      x.value = startX.value + grow * (sizeW.value * cos - sizeH.value * sin);
-      y.value = startY.value + grow * (sizeW.value * sin + sizeH.value * cos);
+      x.value = startX.value + grow * (widthInPage * cos - heightInPage * sin);
+      y.value = startY.value + grow * (widthInPage * sin + heightInPage * cos);
     })
     .onEnd(() => {
       scheduleOnRN(commit, x.value, y.value, ratio.value, rotation.value);
@@ -176,17 +180,17 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
       scheduleOnRN(onSelect, item.id);
     })
     .onUpdate((e) => {
-      const divisor = pageScale > 0 ? pageScale : 1;
+      const divisor = canvasScale.value > 0 ? canvasScale.value : 1;
       const tx = e.translationX / divisor;
       const ty = e.translationY / divisor;
       const cos = Math.cos(rotation.value);
       const sin = Math.sin(rotation.value);
       const localX = tx * cos + ty * sin;
-      const next = Math.min(MAX_BOX_WIDTH, Math.max(MIN_BOX_WIDTH, startWidth.value + localX / zoom));
+      const next = Math.min(MAX_BOX_WIDTH, Math.max(MIN_BOX_WIDTH, startWidth.value + localX / item.scale));
       const delta = next - startWidth.value;
       // The box grows to the right of its left edge, so its middle (the turning point) moves half as far.
-      x.value = startX.value + (delta * (zoom * cos - 1)) / 2;
-      y.value = startY.value + (delta * zoom * sin) / 2;
+      x.value = startX.value + (delta * (item.scale * cos - 1)) / 2;
+      y.value = startY.value + (delta * item.scale * sin) / 2;
       widthNow.value = next;
       scheduleOnRN(showLiveWidth, next);
     })
@@ -198,20 +202,25 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
   // A scaled box grows from its middle; this puts its top-left corner where the saved x / y say.
   const baseWidth = measured.w / measured.zoom;
   const baseHeight = measured.h / measured.zoom;
-  const shiftX = (-baseWidth * (zoom - 1)) / 2;
-  const shiftY = (-baseHeight * (zoom - 1)) / 2;
+  const shiftX = ((-baseWidth * (item.scale - 1)) / 2) * renderScale;
+  const shiftY = ((-baseHeight * (item.scale - 1)) / 2) * renderScale;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: x.value + shiftX },
-      { translateY: y.value + shiftY },
+      { translateX: x.value * renderScale + shiftX },
+      { translateY: y.value * renderScale + shiftY },
       { rotate: `${rotation.value}rad` },
       { scale: ratio.value },
     ],
   }));
 
+  /** Handles and the padlock keep their size on screen, however far the page is zoomed. */
+  const handleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: renderScale / (canvasScale.value * ratio.value) }],
+  }));
+
   const shown = useMemo(() => (live !== null && live.base === item.width ? { ...item, width: live.width } : item), [item, live]);
-  const notMeasuredYet = zoom !== 1 && measured.w === 0;
+  const notMeasuredYet = item.scale !== 1 && measured.w === 0;
 
   return (
     <Animated.View pointerEvents="box-none" style={[styles.item, animatedStyle, notMeasuredYet && styles.hidden]}>
@@ -251,31 +260,33 @@ function CanvasItemViewBase({ item, pageScale, selected, onSelect, onEdit, onCha
         <>
           {hasWidth ? (
             <GestureDetector gesture={stretch}>
-              <View accessible accessibilityRole="adjustable" accessibilityLabel={strings.widthHandle} style={styles.widthHit} hitSlop={HANDLE_SLOP}>
+              <Animated.View accessible accessibilityRole="adjustable" accessibilityLabel={strings.widthHandle} style={[styles.widthHit, handleStyle]} hitSlop={HANDLE_SLOP}>
                 <View style={styles.widthGrip} />
-              </View>
+              </Animated.View>
             </GestureDetector>
           ) : null}
           <GestureDetector gesture={resize}>
-            <View accessible accessibilityRole="adjustable" accessibilityLabel={strings.resizeHandle} style={styles.resizeHit} hitSlop={HANDLE_SLOP}>
+            <Animated.View accessible accessibilityRole="adjustable" accessibilityLabel={strings.resizeHandle} style={[styles.resizeHit, handleStyle]} hitSlop={HANDLE_SLOP}>
               <View style={styles.resizeGrip}>
                 <Ionicons name="resize" size={14} color="#FFFFFF" />
               </View>
-            </View>
+            </Animated.View>
           </GestureDetector>
         </>
       ) : null}
 
       {locked ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={strings.unlockItem}
-          hitSlop={HANDLE_SLOP}
-          onPress={() => onChange(item.id, { locked: false })}
-          style={styles.badge}
-        >
-          <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
-        </Pressable>
+        <Animated.View style={[styles.badge, handleStyle]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={strings.unlockItem}
+            hitSlop={HANDLE_SLOP}
+            onPress={() => onChange(item.id, { locked: false })}
+            style={styles.badgeHit}
+          >
+            <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
+          </Pressable>
+        </Animated.View>
       ) : null}
     </Animated.View>
   );
@@ -288,9 +299,10 @@ const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   frame: { borderRadius: 8, borderWidth: 1.5, borderColor: 'transparent' },
   selected: { borderColor: '#8A8794', borderStyle: 'dashed' },
-  widthHit: { position: 'absolute', right: -HANDLE_OFFSET, top: '50%', marginTop: -16, width: 22, height: 32, alignItems: 'center', justifyContent: 'center' },
+  widthHit: { position: 'absolute', right: -11, top: '50%', marginTop: -16, width: 22, height: 32, alignItems: 'center', justifyContent: 'center' },
   widthGrip: { width: 8, height: 30, borderRadius: 4, backgroundColor: '#3D6FD8', borderWidth: 1.5, borderColor: '#FFFFFF' },
-  resizeHit: { position: 'absolute', right: -HANDLE_OFFSET, bottom: -HANDLE_OFFSET, width: HANDLE_SIZE, height: HANDLE_SIZE },
+  resizeHit: { position: 'absolute', right: -HANDLE_SIZE / 2, bottom: -HANDLE_SIZE / 2, width: HANDLE_SIZE, height: HANDLE_SIZE },
   resizeGrip: { flex: 1, borderRadius: HANDLE_SIZE / 2, backgroundColor: '#3D6FD8', borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  badge: { position: 'absolute', right: 3, top: 3, opacity: 0.85, width: BADGE_SIZE, height: BADGE_SIZE, borderRadius: BADGE_SIZE / 2, backgroundColor: '#5B5868', borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', right: 3, top: 3, opacity: 0.85, width: BADGE_SIZE, height: BADGE_SIZE, borderRadius: BADGE_SIZE / 2, backgroundColor: '#5B5868', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  badgeHit: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

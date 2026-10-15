@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   bar: { paddingTop: BAR_PADDING, paddingHorizontal: 12, borderTopWidth: StyleSheet.hairlineWidth, justifyContent: 'center' },
   ghost: { position: 'absolute', left: 12, right: 12, top: 0, opacity: 0 },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  tool: { minHeight: 56, minWidth: 48, paddingHorizontal: 2, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  tool: { minHeight: 56, minWidth: 40, paddingHorizontal: 0, alignItems: 'center', justifyContent: 'center', gap: 2 },
   toolText: { fontSize: 11, fontWeight: '600' },
   swatchHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 2 },
