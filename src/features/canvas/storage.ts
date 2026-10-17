@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { ITEM_KINDS, type CanvasItem, type ItemKind, type Task } from './types';
+import { ITEM_KINDS, TAPE_PATTERNS, TEXT_FONTS, TEXT_SIZES, type CanvasItem, type ItemKind, type TapePattern, type TextFont, type TextSize, type Task } from './types';
 
 function isTask(value: unknown): value is Task {
   if (typeof value !== 'object' || value === null) return false;
@@ -21,6 +21,11 @@ export function isCanvasItem(value: unknown): value is CanvasItem {
     (v.amount === undefined || typeof v.amount === 'number') &&
     (v.width === undefined || typeof v.width === 'number') &&
     (v.locked === undefined || typeof v.locked === 'boolean') &&
+    (v.font === undefined || TEXT_FONTS.includes(v.font as TextFont)) &&
+    (v.textSize === undefined || TEXT_SIZES.includes(v.textSize as TextSize)) &&
+    (v.mark === undefined || typeof v.mark === 'boolean') &&
+    (v.caption === undefined || typeof v.caption === 'string') &&
+    (v.pattern === undefined || TAPE_PATTERNS.includes(v.pattern as TapePattern)) &&
     typeof v.x === 'number' &&
     typeof v.y === 'number' &&
     typeof v.scale === 'number' &&

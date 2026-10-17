@@ -13,6 +13,8 @@ interface DayDotProps {
   cell: number;
   label: string;
   summary?: DaySummary;
+  /** Something new from another phone on this day. */
+  isNew?: boolean;
   /** "100" or "1y" on a milestone day, otherwise null. */
   milestone: string | null;
   colors: PaletteColors;
@@ -39,10 +41,10 @@ function outlineFor(state: DotState, colors: PaletteColors): string {
   return state === 'future' ? colors.dotFuture : colors.dotPast;
 }
 
-function DayDotBase({ dayNumber, state, cell, label, summary, milestone, colors, onPress }: DayDotProps) {
+function DayDotBase({ dayNumber, state, cell, label, summary, isNew = false, milestone, colors, onPress }: DayDotProps) {
   const dot = Math.round(cell * (milestone !== null ? MILESTONE_RATIO : DOT_RATIO));
   const ring = Math.round(cell * RING_RATIO);
-  const mood = summary?.mood ? moodFor(summary.mood) : null;
+  const moods = (summary?.moods ?? (summary?.mood ? [summary.mood] : [])).map(moodFor);
   const filled = summary?.filled === true;
   const solid = state === 'today' || (state === 'past' && filled);
   const hollow = !solid;
@@ -76,10 +78,16 @@ function DayDotBase({ dayNumber, state, cell, label, summary, milestone, colors,
           <Text allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit style={[styles.milestone, { color: textColor }]}>
             {milestone}
           </Text>
-        ) : mood && !hollow ? (
-          <View style={{ width: dot * MOOD_RATIO, height: dot * MOOD_RATIO, borderRadius: dot, backgroundColor: mood.color }} />
+        ) : moods.length > 0 && !hollow ? (
+          // Two moods on one day: the small disc is split in two colours.
+          <View style={[styles.mood, { width: dot * MOOD_RATIO, height: dot * MOOD_RATIO, borderRadius: dot }]}>
+            {moods.map((mood) => (
+              <View key={mood.key} style={{ flex: 1, backgroundColor: mood.color }} />
+            ))}
+          </View>
         ) : null}
       </View>
+      {isNew ? <View style={[styles.newMark, { backgroundColor: colors.today }]} /> : null}
     </Pressable>
   );
 }
@@ -88,7 +96,9 @@ export const DayDot = memo(DayDotBase);
 
 const styles = StyleSheet.create({
   cell: { alignItems: 'center', justifyContent: 'center' },
+  newMark: { position: 'absolute', right: 3, top: 3, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5, borderColor: '#FFFFFF' },
   ring: { position: 'absolute', borderWidth: 1.5 },
   dot: { alignItems: 'center', justifyContent: 'center' },
+  mood: { flexDirection: 'row', overflow: 'hidden' },
   milestone: { fontSize: MILESTONE_FONT, fontWeight: '700', paddingHorizontal: 1 },
 });

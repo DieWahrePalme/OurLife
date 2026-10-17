@@ -13,12 +13,18 @@ interface SkinPickerProps {
 const DOT = 14;
 const PREVIEW_DOTS = ['past', 'past', 'today', 'future', 'future'] as const;
 
-/** A small sample of a skin: its backdrop, a title in its font and a few day dots. */
+/** A small sample of a skin: its book (cover and label with the title font) over its backdrop, and a few day dots. */
 function SkinPreview({ skin, scheme }: { skin: Skin; scheme: 'light' | 'dark' }) {
   const p = skin.palettes[scheme];
+  const cover = skin.edition.cover;
   return (
     <View style={[styles.preview, { backgroundColor: p.paper, borderColor: p.line }]}>
-      <Text style={[styles.previewTitle, { color: p.ink, fontFamily: p.fontDisplay }]}>Day 12</Text>
+      <View style={[styles.book, { backgroundColor: cover.base }]}>
+        <View style={[styles.bookSpine, { backgroundColor: cover.spine }]} />
+        <View style={[styles.bookLabel, cover.foil ? { borderColor: cover.foil, borderWidth: 1 } : { backgroundColor: cover.label }]}>
+          <Text style={[styles.previewTitle, { color: cover.labelInk, fontFamily: p.fontDisplay }]}>Day 12</Text>
+        </View>
+      </View>
       <View style={styles.dots}>
         {PREVIEW_DOTS.map((state, i) => (
           <View
@@ -66,8 +72,11 @@ export function SkinPicker({ colors, selected, onSelect }: SkinPickerProps) {
 const styles = StyleSheet.create({
   list: { gap: 10 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 16, padding: 10, minHeight: 88 },
-  preview: { width: 104, height: 68, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  previewTitle: { fontSize: 22, lineHeight: 28 },
+  preview: { width: 104, height: 72, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  book: { width: 84, height: 36, borderRadius: 4, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', paddingLeft: 6 },
+  bookSpine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6 },
+  bookLabel: { paddingHorizontal: 8, borderRadius: 3 },
+  previewTitle: { fontSize: 17, lineHeight: 22 },
   dots: { flexDirection: 'row', gap: 5 },
   dot: { width: DOT - 4, height: DOT - 4, borderRadius: DOT },
   texts: { flex: 1, gap: 2 },

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { DateField } from '@/components/date-field';
 import { useColors, useSkin } from '@/lib/use-theme';
 import { SkinPicker } from '@/features/settings/skin-picker';
 import { strings } from '@/constants/strings';
@@ -75,15 +76,14 @@ export default function SettingsScreen() {
 
       <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsStartTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsStartHint}</Text>
-      <TextInput
+      <DateField
         value={draftDate}
-        onChangeText={(text) => {
-          setDraftDate(text);
+        onChange={(next) => {
+          setDraftDate(next);
           setMessage(null);
         }}
-        autoCapitalize="none"
+        colors={colors}
         accessibilityLabel={strings.settingsStartTitle}
-        style={[styles.input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.page }]}
       />
       {message ? (
         <Text accessibilityLiveRegion="polite" style={{ color: message.isError ? colors.danger : colors.inkSoft, fontSize: 14 }}>

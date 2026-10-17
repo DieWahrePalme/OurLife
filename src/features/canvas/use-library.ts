@@ -51,6 +51,7 @@ export function useLibrary(kind: LibraryKind, query: string, active: boolean): L
     const cached = query.trim() ? undefined : trendingCache.get(kind);
     if (cached) {
       latest.current += 1;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- shows the cached first page at once
       setState(cached);
       return undefined;
     }

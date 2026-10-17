@@ -51,7 +51,7 @@ function LatticeTile({ spec }: { spec: PatternSpec }) {
 export function SkinBackground({ pattern }: { pattern: PatternSpec }) {
   const size = pattern.kind === 'dots' ? DOT_TILE : LATTICE_TILE;
   return (
-    <Svg pointerEvents="none" accessible={false} style={StyleSheet.absoluteFill} width="100%" height="100%">
+    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%">
       <Defs>
         <Pattern id="skin-pattern" width={size} height={size} patternUnits="userSpaceOnUse">
           {pattern.kind === 'dots' ? <DotsTile spec={pattern} /> : <LatticeTile spec={pattern} />}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { CodeActions } from '@/components/code-actions';
 import { PillButton } from '@/components/pill-button';
 import { strings } from '@/constants/strings';
 import type { PaletteColors } from '@/constants/theme';
@@ -37,6 +38,7 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the people when the screen opens
     loadMembers();
   }, [loadMembers]);
 
@@ -70,6 +72,7 @@ export function SpaceSection({ colors }: SpaceSectionProps) {
       <Text accessibilityRole="header" style={[styles.title, styles.spaced, { color: colors.ink, fontFamily: colors.fontDisplay }]}>{strings.settingsCodeTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsCodeHint}</Text>
       <Text selectable style={[field, styles.code]}>{pairCode}</Text>
+      {pairCode ? <CodeActions code={pairCode} colors={colors} /> : null}
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.settingsCodeNewHint}</Text>
       <PillButton
         colors={colors}

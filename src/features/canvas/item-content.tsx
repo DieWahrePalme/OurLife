@@ -8,12 +8,13 @@ import { useGoalsStore } from '@/features/goals/goals-store';
 import { moodFor } from './moods';
 import { isKlipyUrl } from './klipy';
 import { isCloudPhoto, usePhotoUri } from './photo-cloud';
-import type { CanvasItem } from './types';
+import Svg, { Path } from 'react-native-svg';
+import { parseDrawing } from './drawing';
+import { TAPE_HEIGHT, TAPE_WIDTH, TapeShape } from './tape-art';
+import { FONT_FAMILY, FONT_LINE_HEIGHT, HIGHLIGHT_COLOR, SIZE_PIXELS, penInk, type CanvasItem } from './types';
 import { strings } from '@/constants/strings';
 
 const PHOTO_WIDTH = 200;
-const TAPE_WIDTH = 120;
-const TAPE_HEIGHT = 34;
 const STICKER_SIZE = 56;
 const IMAGE_STICKER_SIZE = 140;
 export const CARD_WIDTH = 210;
@@ -30,7 +31,7 @@ function makeStyles(zoom: number) {
   const z = (value: number) => value * zoom;
   return StyleSheet.create({
     sticker: { fontSize: z(STICKER_SIZE), lineHeight: z(STICKER_SIZE * 1.25), paddingRight: z(4) },
-    tape: { width: z(TAPE_WIDTH), height: z(TAPE_HEIGHT), opacity: 0.8, borderRadius: 2 },
+    caption: { position: 'absolute', left: z(6), right: z(6), bottom: z(1), textAlign: 'center', fontFamily: 'Caveat_700Bold', fontSize: z(17), lineHeight: z(21), color: INK },
     polaroid: { backgroundColor: '#fff', padding: z(8), paddingBottom: z(22), borderRadius: z(3), shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: z(6), shadowOffset: { width: 0, height: z(3) }, elevation: 3 },
     missing: { alignItems: 'center', justifyContent: 'center', gap: z(6), backgroundColor: '#EFEAE4' },
     missingText: { fontSize: z(12), color: '#6F6A7A', textAlign: 'center', paddingHorizontal: z(8) },
@@ -56,6 +57,8 @@ type Styles = ReturnType<typeof makeStyles>;
 
 interface ItemContentProps {
   item: CanvasItem;
+  /** True for a locked item: nothing on it reacts to touches (not even a checkbox). */
+  inert?: boolean;
   /** Enlargement of the item; layout is done at this size. */
   zoom: number;
   onChange: (id: string, patch: Partial<CanvasItem>) => void;
@@ -63,6 +66,7 @@ interface ItemContentProps {
 
 interface PartProps {
   item: CanvasItem;
+  inert: boolean;
   zoom: number;
   s: Styles;
 }
@@ -71,12 +75,25 @@ function GoalChip({ item, s }: PartProps) {
   const goal = useGoalsStore((state) => state.goals.find((g) => g.id === item.content));
   const amount = item.amount ?? 0;
   return (
-    <View style={[s.goalChip, { borderColor: item.color }]}>
+    <View style={[s.goalChip, { borderColor: penInk(item.color) }]}>
       <Text style={s.goalName}>{goal ? goal.name : 'Deleted goal'}</Text>
       <Text style={[s.goalAmount, { color: amount < 0 ? '#C0463A' : '#2F9E6F' }]}>
         {formatAmount(amount, goal?.unit ?? '')}
       </Text>
     </View>
+  );
+}
+
+/** A drawing made with a finger: its strokes as lines. */
+function DrawingContent({ item, zoom }: PartProps) {
+  const drawing = useMemo(() => parseDrawing(item.content), [item.content]);
+  if (!drawing) return <View style={{ width: 40 * zoom, height: 40 * zoom }} />;
+  return (
+    <Svg width={drawing.w * zoom} height={drawing.h * zoom} viewBox={`0 0 ${drawing.w} ${drawing.h}`} pointerEvents="none">
+      {drawing.strokes.map((stroke, index) => (
+        <Path key={index} d={stroke.d} stroke={penInk(stroke.c)} strokeWidth={stroke.w} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      ))}
+    </Svg>
   );
 }
 
@@ -102,6 +119,11 @@ function PhotoContent({ item, zoom, s }: PartProps) {
           accessibilityLabel={strings.photoLabel}
         />
       )}
+      {item.caption ? (
+        <Text numberOfLines={1} style={s.caption}>
+          {item.caption}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -131,16 +153,63 @@ function PastedSticker({ item, zoom }: PartProps) {
   );
 }
 
-export function ItemContent({ item, zoom, onChange }: ItemContentProps) {
+interface TextLine {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Room around a line of text that still counts as touching it. */
+const LINE_SLOP = 6;
+
+/**
+ * Handwritten text. Only the lines themselves take touches: the empty space beside a short last line does not, so
+ * a chip lying under a big text box can still be picked.
+ */
+function TextItem({ item, zoom, s, inert }: PartProps) {
+  const [lines, setLines] = useState<readonly TextLine[] | null>(null);
+  return (
+    <View pointerEvents="box-none">
+      <Text
+        pointerEvents={inert || (lines && lines.length > 0) ? 'none' : 'auto'}
+        onTextLayout={(event) => setLines(event.nativeEvent.lines.map(({ x, y, width, height }) => ({ x, y, width, height })))}
+        style={[
+          s.text,
+          {
+            color: penInk(item.color),
+            fontFamily: FONT_FAMILY[item.font ?? 'hand'],
+            fontSize: SIZE_PIXELS[item.textSize ?? 'm'] * zoom,
+            lineHeight: SIZE_PIXELS[item.textSize ?? 'm'] * FONT_LINE_HEIGHT[item.font ?? 'hand'] * zoom,
+          },
+          item.mark ? { backgroundColor: HIGHLIGHT_COLOR } : null,
+          item.width ? { width: item.width * zoom } : { maxWidth: TEXT_MAX_WIDTH * zoom },
+        ]}
+      >
+        {item.content}
+      </Text>
+      {(inert ? null : lines)?.map((line, index) => (
+        <View
+          key={index}
+          style={{ position: 'absolute', left: line.x - LINE_SLOP * zoom, top: line.y, width: line.width + 2 * LINE_SLOP * zoom, height: line.height }}
+        />
+      ))}
+    </View>
+  );
+}
+
+export function ItemContent({ item, zoom, inert = false, onChange }: ItemContentProps) {
   const s = useMemo(() => makeStyles(zoom), [zoom]);
-  const part = { item, zoom, s };
+  const part = { item, zoom, s, inert };
   switch (item.kind) {
     case 'sticker':
       if (isKlipyUrl(item.content)) return <ImageSticker {...part} />;
       if (isCloudPhoto(item.content) || /^(file|data|blob):/i.test(item.content)) return <PastedSticker {...part} />;
       return <Text style={s.sticker}>{item.content}</Text>;
+    case 'drawing':
+      return <DrawingContent {...part} />;
     case 'tape':
-      return <View style={[s.tape, { backgroundColor: item.color }]} />;
+      return <TapeShape color={item.color} pattern={item.pattern ?? 'plain'} width={TAPE_WIDTH * zoom} height={TAPE_HEIGHT * zoom} />;
     case 'photo':
       return <PhotoContent {...part} />;
     case 'goal':
@@ -156,28 +225,29 @@ export function ItemContent({ item, zoom, onChange }: ItemContentProps) {
     }
     case 'focus':
       return (
-        <View style={[s.card, { borderColor: item.color, width: (item.width ?? CARD_WIDTH) * zoom }]}>
-          <Text style={[s.cardTitle, { color: item.color }]}>{strings.focusTitle}</Text>
+        <View style={[s.card, { borderColor: penInk(item.color), width: (item.width ?? CARD_WIDTH) * zoom }]}>
+          <Text style={[s.cardTitle, { color: penInk(item.color) }]}>{strings.focusTitle}</Text>
           <Text style={s.focusText}>{item.content}</Text>
         </View>
       );
     case 'todo': {
       const tasks = item.tasks ?? [];
       return (
-        <View style={[s.card, { borderColor: item.color, width: (item.width ?? CARD_WIDTH) * zoom }]}>
-          <Text style={[s.cardTitle, { color: item.color }]}>{strings.todoTitle}</Text>
+        <View style={[s.card, { borderColor: penInk(item.color), width: (item.width ?? CARD_WIDTH) * zoom }]}>
+          <Text style={[s.cardTitle, { color: penInk(item.color) }]}>{strings.todoTitle}</Text>
           {tasks.map((task, index) => (
             <Pressable
               key={`${index}-${task.text}`}
               accessibilityRole="checkbox"
               accessibilityLabel={strings.taskLabel(task.text, task.done)}
-              accessibilityState={{ checked: task.done }}
+              accessibilityState={{ checked: task.done, disabled: inert }}
+              disabled={inert}
               onPress={() =>
                 onChange(item.id, { tasks: tasks.map((t, i) => (i === index ? { ...t, done: !t.done } : t)) })
               }
               style={s.taskRow}
             >
-              <View style={[s.box, { borderColor: item.color, backgroundColor: task.done ? item.color : 'transparent' }]}>
+              <View style={[s.box, { borderColor: penInk(item.color), backgroundColor: task.done ? penInk(item.color) : 'transparent' }]}>
                 {task.done ? <Text style={s.check}>✓</Text> : null}
               </View>
               <Text style={[s.taskText, task.done && s.taskDone]}>{task.text}</Text>
@@ -187,10 +257,6 @@ export function ItemContent({ item, zoom, onChange }: ItemContentProps) {
       );
     }
     default:
-      return (
-        <Text style={[s.text, { color: item.color }, item.width ? { width: item.width * zoom } : { maxWidth: TEXT_MAX_WIDTH * zoom }]}>
-          {item.content}
-        </Text>
-      );
+      return <TextItem {...part} />;
   }
 }

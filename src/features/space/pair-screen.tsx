@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CodeActions } from '@/components/code-actions';
 import { PillButton } from '@/components/pill-button';
 import { useColors } from '@/lib/use-theme';
 import { strings } from '@/constants/strings';
@@ -40,6 +41,7 @@ export function PairScreen() {
             <Text selectable accessibilityLabel={`Code ${pairCode}`} style={[styles.code, { color: colors.ink, backgroundColor: colors.page, borderColor: colors.line }]}>
               {pairCode}
             </Text>
+            <CodeActions code={pairCode ?? ''} colors={colors} />
             {notice ? <Text style={{ color: colors.danger, fontSize: 14 }}>{notice}</Text> : null}
             <PillButton colors={colors} label={strings.pairContinue} onPress={confirmCreated} />
           </>

@@ -64,9 +64,9 @@ export function NewGoalForm({ colors, existingNames, onCreate }: NewGoalFormProp
 const styles = StyleSheet.create({
   form: { gap: 10 },
   row: { flexDirection: 'row', gap: 10 },
-  grow: { flex: 1 },
-  unit: { width: 110 },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
+  grow: { flex: 1, minWidth: 0 },
+  unit: { width: 110, minWidth: 0, flexShrink: 1 },
+  input: { minHeight: 48, minWidth: 0, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
   button: { minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontSize: 16, fontWeight: '700' },
 });

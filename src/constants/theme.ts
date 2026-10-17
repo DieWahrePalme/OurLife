@@ -36,7 +36,7 @@ export const Palette: Readonly<Record<'light' | 'dark', PaletteColors>> = {
   light: {
     paper: '#FAF6F0',
     page: '#FFFFFF',
-    sheet: '#FFFFFF',
+    sheet: '#FBF8F1',
     sheetInkSoft: '#6F6A7A',
     ink: '#2E2B3A',
     inkSoft: '#6F6A7A',
@@ -53,8 +53,8 @@ export const Palette: Readonly<Record<'light' | 'dark', PaletteColors>> = {
   dark: {
     paper: '#1B1A1F',
     page: '#24222A',
-    sheet: '#24222A',
-    sheetInkSoft: '#A39DAD',
+    sheet: '#FBF8F1',
+    sheetInkSoft: '#6F6A7A',
     ink: '#F3EEE8',
     inkSoft: '#A39DAD',
     dotPast: '#E48AA2',

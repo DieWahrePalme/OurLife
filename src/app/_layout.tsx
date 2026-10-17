@@ -1,6 +1,8 @@
 import { Caveat_700Bold } from '@expo-google-fonts/caveat';
 import { CormorantGaramond_700Bold } from '@expo-google-fonts/cormorant-garamond';
 import { Kalam_700Bold } from '@expo-google-fonts/kalam';
+import { Lora_600SemiBold } from '@expo-google-fonts/lora';
+import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
 import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -16,6 +18,9 @@ import { useSpaceStore } from '@/features/space/space-store';
 import { useSettingsStore } from '@/features/settings/settings-store';
 import { subscribeToTable } from '@/features/sync/realtime';
 import { useColors, useScheme, useSkin } from '@/lib/use-theme';
+import { installWebFixes } from '@/lib/web-fixes';
+import { useSeenStore } from '@/features/days/seen-store';
+import { useTipsStore } from '@/features/canvas/tips-store';
 
 /** The navigation draws its own screen background; it has to be see-through so the skin shows. */
 const SEE_THROUGH_THEME = {
@@ -38,7 +43,7 @@ export default function RootLayout() {
   const skin = useSkin();
   const colors = useColors();
   const statusBar = skin.statusBar[scheme];
-  const [fontsLoaded] = useFonts({ Caveat_700Bold, CormorantGaramond_700Bold, Kalam_700Bold });
+  const [fontsLoaded] = useFonts({ Caveat_700Bold, CormorantGaramond_700Bold, Kalam_700Bold, Lora_600SemiBold, PermanentMarker_400Regular });
 
   const settingsLoaded = useSettingsStore((state) => state.loaded);
   const loadSettings = useSettingsStore((state) => state.load);
@@ -46,6 +51,12 @@ export default function RootLayout() {
   const spaceStatus = useSpaceStore((state) => state.status);
   const initSpace = useSpaceStore((state) => state.init);
   const loadGoals = useGoalsStore((state) => state.load);
+
+  useEffect(() => {
+    installWebFixes();
+    useSeenStore.getState().load();
+    useTipsStore.getState().load();
+  }, []);
 
   useEffect(() => {
     loadSettings();

@@ -11,15 +11,16 @@ interface Deleted {
 }
 
 interface UndoDelete {
-  /** The item that can still be brought back, or null. */
+  /** The item that can still be brought back with the bar, or null. */
   deleted: CanvasItem | null;
   deleteItem: (id: string) => void;
   undo: () => void;
 }
 
 /**
- * Deleting is instant, but the last deleted item can be brought back for a few seconds.
- * The photo file of a deleted photo is only removed once the time is up, so Undo gets the picture back too.
+ * Deleting is instant, and the last deleted item can be brought back with a bar for a few seconds. Undo / redo of the
+ * page can bring back any deleted item for as long as the page is open, so the photo files of deleted photos are only
+ * removed when the page is left (and only if no item uses the file again by then).
  */
 export function useUndoDelete(
   items: readonly CanvasItem[],
@@ -29,14 +30,18 @@ export function useUndoDelete(
   const [deleted, setDeleted] = useState<Deleted | null>(null);
   const pending = useRef<Deleted | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const photoFiles = useRef<Set<string>>(new Set());
+  const latestItems = useRef<readonly CanvasItem[]>(items);
 
-  /** The time is up (or a newer delete came): the photo file can go now. */
+  useEffect(() => {
+    latestItems.current = items;
+  }, [items]);
+
+  /** The bar's time is up (or a newer delete came). */
   const finish = useCallback(() => {
     clearTimeout(timer.current);
-    const last = pending.current;
     pending.current = null;
     setDeleted(null);
-    if (last && isCloudPhoto(last.item.content)) deletePhoto(last.item.content);
   }, []);
 
   const deleteItem = useCallback(
@@ -47,6 +52,7 @@ export function useUndoDelete(
       const next = { item: items[index], index };
       pending.current = next;
       setDeleted(next);
+      if (isCloudPhoto(next.item.content)) photoFiles.current.add(next.item.content);
       remove(id);
       timer.current = setTimeout(finish, UNDO_WINDOW_MS);
     },
@@ -56,14 +62,20 @@ export function useUndoDelete(
   const undo = useCallback(() => {
     const last = pending.current;
     if (!last) return;
-    clearTimeout(timer.current);
-    pending.current = null;
-    setDeleted(null);
+    finish();
     restore(last.item, last.index);
-  }, [restore]);
+  }, [restore, finish]);
 
-  // Leaving the page counts as "time is up".
-  useEffect(() => finish, [finish]);
+  // Leaving the page: the files of deleted photos go now, unless an item (after an undo) uses them again.
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      for (const content of photoFiles.current) {
+        if (!latestItems.current.some((it) => it.content === content)) deletePhoto(content);
+      }
+    },
+    [],
+  );
 
   return { deleted: deleted?.item ?? null, deleteItem, undo };
 }

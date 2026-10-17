@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { DateField } from '@/components/date-field';
 import { PillButton } from '@/components/pill-button';
 import { strings } from '@/constants/strings';
 import type { PaletteColors } from '@/constants/theme';
@@ -49,7 +50,7 @@ export function CreateSpaceForm({ colors, initialStartDate, busy, onSubmit, onBa
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.setupYourNameHint}</Text>
 
       <Text style={label}>{strings.setupStartDate}</Text>
-      <TextInput style={field} value={startDate} onChangeText={setStartDate} autoCapitalize="none" accessibilityLabel={strings.setupStartDate} />
+      <DateField value={startDate} onChange={setStartDate} colors={colors} accessibilityLabel={strings.setupStartDate} />
 
       <Text accessibilityRole="header" style={label}>{strings.setupGoalsTitle}</Text>
       <Text style={[styles.hint, { color: colors.inkSoft }]}>{strings.setupGoalsHint}</Text>

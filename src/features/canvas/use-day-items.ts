@@ -9,6 +9,8 @@ import { EMPTY_SNAPSHOT, fetchDay, pushDay, type DaySnapshot } from './day-cloud
 import { baseOf, loadBase, mergeDay, saveBase, type DayBase } from './day-merge';
 import { loadDay, saveDay } from './storage';
 import type { CanvasItem } from './types';
+import { useSeenStore } from '@/features/days/seen-store';
+import { applyEntry, coalesce, HISTORY_LIMIT, type Entry } from './history';
 
 const SAVE_DELAY_MS = 400;
 const REFETCH_DELAY_MS = 250;
@@ -19,19 +21,33 @@ interface DayItems {
   items: readonly CanvasItem[];
   /** False until the page loaded, and stays false if loading failed (so nothing gets overwritten). */
   canEdit: boolean;
+  /** True once the copy saved on this phone is shown (before the shared copy has been fetched). */
+  localReady: boolean;
   error: string | null;
   add: (item: CanvasItem) => void;
+  /** Adds or removes an item without a step of undo (a drawing that is still being drawn). */
+  addSilently: (item: CanvasItem) => void;
+  removeSilently: (id: string) => void;
+  /** Adds several items as one step of undo (a template). */
+  addMany: (items: readonly CanvasItem[]) => void;
   update: (id: string, patch: Partial<CanvasItem>) => void;
+  /** Changes an item without adding a step to undo (the app itself swaps a local photo for its cloud copy). */
+  updateSilently: (id: string, patch: Partial<CanvasItem>) => void;
   remove: (id: string) => void;
   /** Puts a removed item back at its old place in the stacking order. */
   restore: (item: CanvasItem, index: number) => void;
   bringToFront: (id: string) => void;
   sendToBack: (id: string) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export function useDayItems(dayNumber: number): DayItems {
   const [items, setItems] = useState<readonly CanvasItem[]>([]);
   const [canEdit, setCanEdit] = useState(false);
+  const [localReady, setLocalReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loaded = useRef(false);
   const latestItems = useRef<readonly CanvasItem[]>([]);
@@ -84,7 +100,10 @@ export function useDayItems(dayNumber: number): DayItems {
       rememberBase(remote.items);
       setNeedsRetry(false);
       setError(null);
-      if (stableJson(merged) !== stableJson(local)) setItems(merged);
+      if (stableJson(merged) !== stableJson(local)) {
+        latestItems.current = merged;
+        setItems(merged);
+      }
       if (stableJson(merged) !== stableJson(remote.items)) await pushToCloud(spaceId, merged);
     },
     [dayNumber, rememberBase, pushToCloud],
@@ -96,11 +115,13 @@ export function useDayItems(dayNumber: number): DayItems {
     loaded.current = false;
     synced.current = EMPTY_SNAPSHOT;
     base.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new page is not editable until it has loaded
     setCanEdit(false);
     (async () => {
       const [stored, storedBase] = await Promise.all([loadDay(dayNumber), loadBase(dayNumber).catch(() => null)]);
       if (cancelled) return;
       setItems(stored);
+      setLocalReady(true);
       latestItems.current = stored;
       base.current = storedBase;
       if (spaceId) {
@@ -191,35 +212,121 @@ export function useDayItems(dayNumber: number): DayItems {
     };
   }, [pullFromCloud]);
 
-  const add = useCallback((item: CanvasItem) => setItems((prev) => [...prev, item]), []);
+  const past = useRef<Entry[]>([]);
+  const future = useRef<Entry[]>([]);
+  const [steps, setSteps] = useState({ undo: 0, redo: 0 });
+  const syncSteps = () => setSteps({ undo: past.current.length, redo: future.current.length });
+
+  /** Runs a change on the newest items right away (so quick changes in a row see each other). */
+  const change = useCallback((make: (prev: readonly CanvasItem[]) => readonly CanvasItem[]) => {
+    const next = make(latestItems.current);
+    if (next === latestItems.current) return;
+    latestItems.current = next;
+    setItems(next);
+  }, []);
+
+  const record = useCallback((entry: Entry) => {
+    past.current = [...coalesce(past.current, entry, Date.now())].slice(-HISTORY_LIMIT);
+    future.current = [];
+    setSteps({ undo: past.current.length, redo: 0 });
+  }, []);
+
+  const add = useCallback(
+    (item: CanvasItem) => {
+      useSeenStore.getState().markMine(item.id);
+      record({ kind: 'item', id: item.id, before: null, after: item, index: latestItems.current.length, at: 0 });
+      change((prev) => [...prev, item]);
+    },
+    [change, record],
+  );
+  const addSilently = useCallback(
+    (item: CanvasItem) => {
+      useSeenStore.getState().markMine(item.id);
+      change((prev) => [...prev, item]);
+    },
+    [change],
+  );
+  const removeSilently = useCallback((id: string) => change((prev) => prev.filter((it) => it.id !== id)), [change]);
+  const addMany = useCallback(
+    (added: readonly CanvasItem[]) => {
+      const group = Date.now();
+      const base = latestItems.current.length;
+      added.forEach((item, index) => {
+        useSeenStore.getState().markMine(item.id);
+        const entry: Entry = { kind: 'item', id: item.id, before: null, after: item, index: base + index, at: group, group };
+        past.current = [...past.current, entry].slice(-HISTORY_LIMIT);
+      });
+      future.current = [];
+      setSteps({ undo: past.current.length, redo: 0 });
+      change((prev) => [...prev, ...added]);
+    },
+    [change],
+  );
+  const updateSilently = useCallback(
+    (id: string, patch: Partial<CanvasItem>) => change((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it))),
+    [change],
+  );
   const update = useCallback(
-    (id: string, patch: Partial<CanvasItem>) =>
-      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it))),
-    [],
+    (id: string, patch: Partial<CanvasItem>) => {
+      const before = latestItems.current.find((it) => it.id === id);
+      if (!before) return;
+      const after = { ...before, ...patch };
+      if (stableJson(before) === stableJson(after)) return;
+      record({ kind: 'item', id, before, after, index: latestItems.current.indexOf(before), at: 0 });
+      change((prev) => prev.map((it) => (it.id === id ? after : it)));
+    },
+    [change, record],
   );
-  const remove = useCallback((id: string) => setItems((prev) => prev.filter((it) => it.id !== id)), []);
+  const remove = useCallback(
+    (id: string) => {
+      const before = latestItems.current.find((it) => it.id === id);
+      if (!before) return;
+      record({ kind: 'item', id, before, after: null, index: latestItems.current.indexOf(before), at: 0 });
+      change((prev) => prev.filter((it) => it.id !== id));
+    },
+    [change, record],
+  );
   const restore = useCallback(
-    (item: CanvasItem, index: number) =>
-      setItems((prev) => (prev.some((it) => it.id === item.id) ? prev : [...prev.slice(0, index), item, ...prev.slice(index)])),
-    [],
+    (item: CanvasItem, index: number) => {
+      if (latestItems.current.some((it) => it.id === item.id)) return;
+      record({ kind: 'item', id: item.id, before: null, after: item, index, at: 0 });
+      change((prev) => [...prev.slice(0, index), item, ...prev.slice(index)]);
+    },
+    [change, record],
   );
-  const bringToFront = useCallback(
-    (id: string) =>
-      setItems((prev) => {
-        const target = prev.find((it) => it.id === id);
-        return target ? [...prev.filter((it) => it.id !== id), target] : prev;
-      }),
-    [],
+  const move = useCallback(
+    (id: string, toFront: boolean) => {
+      const from = latestItems.current.findIndex((it) => it.id === id);
+      if (from < 0) return;
+      const to = toFront ? latestItems.current.length - 1 : 0;
+      if (from === to) return;
+      record({ kind: 'order', id, from, to, at: 0 });
+      change((prev) => applyEntry(prev, { kind: 'order', id, from, to, at: 0 }, 'redo'));
+    },
+    [change, record],
   );
+  const bringToFront = useCallback((id: string) => move(id, true), [move]);
+  const sendToBack = useCallback((id: string) => move(id, false), [move]);
 
-  const sendToBack = useCallback(
-    (id: string) =>
-      setItems((prev) => {
-        const target = prev.find((it) => it.id === id);
-        return target ? [target, ...prev.filter((it) => it.id !== id)] : prev;
-      }),
-    [],
-  );
+  const undo = useCallback(() => {
+    const last = past.current[past.current.length - 1];
+    if (!last) return;
+    // Steps of one group (a template) are undone together.
+    const steps = last.group ? past.current.filter((entry) => entry.group === last.group) : [last];
+    past.current = past.current.slice(0, past.current.length - steps.length);
+    future.current = [...future.current, ...steps];
+    change((prev) => [...steps].reverse().reduce((items, entry) => applyEntry(items, entry, 'undo'), prev));
+    syncSteps();
+  }, [change]);
+  const redo = useCallback(() => {
+    const last = future.current[future.current.length - 1];
+    if (!last) return;
+    const steps = last.group ? future.current.filter((entry) => entry.group === last.group) : [last];
+    future.current = future.current.slice(0, future.current.length - steps.length);
+    past.current = [...past.current, ...[...steps].reverse()];
+    change((prev) => [...steps].reverse().reduce((items, entry) => applyEntry(items, entry, 'redo'), prev));
+    syncSteps();
+  }, [change]);
 
-  return { items, canEdit, error, add, update, remove, restore, bringToFront, sendToBack };
+  return { items, canEdit, localReady, error, add, addMany, addSilently, removeSilently, update, updateSilently, remove, restore, bringToFront, sendToBack, undo, redo, canUndo: steps.undo > 0, canRedo: steps.redo > 0 };
 }

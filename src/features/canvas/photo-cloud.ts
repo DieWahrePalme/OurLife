@@ -147,6 +147,7 @@ export function usePhotoUri(content: string): string | null {
 
   useEffect(() => {
     if (!isCloudPhoto(content)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- follows a prop that changes from a cloud reference to a local file
       setUri(isLocalUri(content) ? content : null);
       return undefined;
     }

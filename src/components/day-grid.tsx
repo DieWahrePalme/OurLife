@@ -19,6 +19,8 @@ interface DayGridProps {
   todayNumber: number;
   colors: PaletteColors;
   summaries: DaySummaries;
+  /** Day numbers with something new from another phone. */
+  newDays: ReadonlySet<number>;
 }
 
 interface WeekRowProps {
@@ -29,6 +31,7 @@ interface WeekRowProps {
   monthLabel: string | null;
   colors: PaletteColors;
   summaries: DaySummaries;
+  newDays: ReadonlySet<number>;
   onPressDay: (dayNumber: number) => void;
 }
 
@@ -40,7 +43,7 @@ function detailsFor(milestone: string | null, summary: DaySummary | undefined): 
   return details;
 }
 
-const WeekRow = memo(function WeekRow({ week, startStamp, todayNumber, cell, monthLabel, colors, summaries, onPressDay }: WeekRowProps) {
+const WeekRow = memo(function WeekRow({ week, startStamp, todayNumber, cell, monthLabel, colors, summaries, newDays, onPressDay }: WeekRowProps) {
   const firstDay = week * COLUMNS + 1;
   const days = Array.from({ length: COLUMNS }, (_, i) => firstDay + i);
   return (
@@ -59,6 +62,7 @@ const WeekRow = memo(function WeekRow({ week, startStamp, todayNumber, cell, mon
             cell={cell}
             colors={colors}
             summary={summaries[n]}
+            isNew={newDays.has(n)}
             milestone={milestone}
             label={strings.dotLabel(n, formatDay(dateForDayNumber(startStamp, n)), detailsFor(milestone, summaries[n]))}
             onPress={onPressDay}
@@ -71,7 +75,7 @@ const WeekRow = memo(function WeekRow({ week, startStamp, todayNumber, cell, mon
 
 type TodayDirection = 'up' | 'down' | null;
 
-export function DayGrid({ startStamp, todayNumber, colors, summaries }: DayGridProps) {
+export function DayGrid({ startStamp, todayNumber, colors, summaries, newDays }: DayGridProps) {
   const router = useRouter();
   const listRef = useRef<FlatList<number>>(null);
   const [away, setAway] = useState<TodayDirection>(null);
@@ -139,6 +143,7 @@ export function DayGrid({ startStamp, todayNumber, colors, summaries }: DayGridP
           monthLabel={monthLabels.get(item) ?? null}
           colors={colors}
           summaries={summaries}
+          newDays={newDays}
           onPressDay={onPressDay}
         />
       )}
