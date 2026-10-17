@@ -1,7 +1,7 @@
 # OurLife
 
 A shared "days together" journal. A grid of dots, one per day since the start date.
-Tap a day to open a free-form page (text, stickers and GIFs, photos, to-dos, moods, goals).
+Tap a day to open a free-form page (text, stickers and GIFs, photos, drawings, to-dos, moods, goals).
 The phones of a space (a couple, up to 20 people) share it and sync live. Built with
 Expo (React Native) + TypeScript + Supabase.
 
@@ -10,44 +10,35 @@ UI is English only. Personal content never goes in this repo.
 Repo: https://github.com/DieWahrePalme/OurLife (public)
 Web version: https://diewahrepalme.github.io/OurLife/
 
-## Status (2026-10-12)
+## Status (2026-10-17)
 
-Works on a phone (Expo Go), in a browser and on GitHub Pages. Phones join a space with a code
-and share days, goals, the start date and photos, live. Everything is committed and pushed.
-Skins and paste-sticker were tried on phones and work, see `docs/HANDOFF.md`.
+Version **2.0.0 ("Our book")** is built and checked in a browser but **not committed yet** (waiting for Moritz's go). The last
+commit on `main` is `96a9ac4`. Works on a phone (Expo Go), in a browser and on GitHub Pages. Phones join a space with a code and
+share days, goals, the start date and photos, live. No SQL or migration is needed for version 2.
 
 | Part | State |
 | --- | --- |
-| Home: "Day N", 7-column dot grid, month labels, light + dark | done |
-| Day page: text, stickers, washi tape, photos, to-do, focus, mood | done |
-| Day page has the same size on every device (360 x 580, scaled to fit) | new |
-| Gestures: drag, pinch-resize, twist-rotate, recolour, front, delete | done |
-| Goals: `/goal car +50` commands, goal pages, totals, progress | done |
-| Settings: colour per phone, shared start date, space name | done, name new |
-| Supabase: anonymous sign-in, pairing code, row level security | done, tested |
-| Space setup: name, own name, start date, optional goals | new |
-| Up to 20 people per space, every member is an admin (remove people, new code) | new, needs `migration-002` (run) |
-| Lost phone: join again from the new one, remove the old entry | new |
-| Offline edits are kept and sent later (days and goals) | new |
-| Leave space; removing a member makes a new code | new, needs `migration-004` |
-| Rate limiter and size caps against abuse | new, needs `migration-004` |
-| Appearance: system / light / dark (per phone) | new |
-| Sticker + GIF library from KLIPY (search, trending), own GIFs as photos | new, needs a KLIPY key and `migration-003` |
-| Live sync of days, goals and start date between phones | done |
-| Photos in the private cloud bucket | done |
-| Web version on GitHub Pages | done (rebuilt on every push to `main`) |
-| Offline start date change | not built |
-| Day grid: filled days, mood dots, milestones (100 / 1y), Today button | new |
-| Day page: icon toolbar, day arrows, undo after delete | new |
-| Photos missing on the other phone are uploaded again when the day opens | new |
-| Skins per phone: Original, Scrapbook, Luxury (Settings > Look) | new, more skins possible |
-| Paste a cut-out sticker from the clipboard (iOS "Copy" on a subject) | new |
-| Goals page polish, haptics, small motion | idea, not started |
-| Long-press a day on Home for a quick preview | idea, not started |
+| Home: book cover per skin, day counter, switch **Pages \| Dots** (little pages or dot grid) | v2, not on a phone yet |
+| Day page: paper with page number and stack edge, turn pages by arrows or swipe | v2, not on a phone yet |
+| Day page 360 x 580 on every device; zoom (pinch, double tap, wheel, buttons) up to 8x, sharp when zoomed | done |
+| Items: text (3 fonts, 3 sizes, highlighter), sticker, washi tape rolls, photo with caption, to-do, focus, 9 moods, goal chips | done / v2 |
+| Drawing with a finger, page templates, "share page as picture" | v2 |
+| Move, resize, two-finger scale and turn, turn handle, padlock, copy, front / back, undo / redo | done / v2 |
+| New items land on a free spot; items stay a third on the page | v2 |
+| Yellow "N new things" note on Home, first-page tips | v2 |
+| Goals: `/goal car +50`, goal pages, totals, progress | done |
+| Space: setup, code, up to 20 people (all admins), leave, rate limits | done (migrations 002 to 004 applied) |
+| Offline edits kept and sent later; live sync; photos in a private bucket | done |
+| Sticker + GIF library (KLIPY), paste a cut-out sticker | done |
+| Skins per phone: Original, Scrapbook, Luxury; light / dark | done |
+| Web version on GitHub Pages (rebuilt on every push to `main`) | done |
+| Partner-delete notice / history, goals form as a sheet, more skins | parked |
 | Native iOS build (EAS / TestFlight) | not started |
 
-Next steps, open questions and known small things: `docs/HANDOFF.md` (start there).
-Product description: `docs/PRD.md`.
+Version 2 keeps old data safe: no stored item is rewritten, new data is only optional fields, and a phone with version 1 neither
+deletes nor breaks items with new fields or the new `drawing` kind.
+
+Start with `docs/HANDOFF.md` (state, phone checklist, next steps). Product description: `docs/PRD.md`.
 
 ## Run it
 
@@ -59,7 +50,8 @@ REACT_NATIVE_PACKAGER_HOSTNAME=100.117.131.14 npx expo start --port 8082 --host 
 
 - iPhone (Expo Go, Tailscale on): `exp://100.117.131.14:8082`
 - Browser: http://localhost:8082
-- Type check: `npx tsc --noEmit`
+- Checks: `npx tsc --noEmit`, `npm run lint`, `npx expo export --platform web`
+- After any `npx expo install`, regenerate the lock: `npx npm@latest install --package-lock-only` (CI uses `npm ci` on Node 24)
 - Without `.env` the app runs in local-only mode (no pairing). Without a KLIPY key only the emoji stickers are offered.
 - Restart the dev server after changing `.env`. Lint: `npx expo lint`.
 - Port 8081 belongs to another project (DoYouKnow). Do not use it.
@@ -67,8 +59,10 @@ REACT_NATIVE_PACKAGER_HOSTNAME=100.117.131.14 npx expo start --port 8082 --host 
 ## How it is built
 
 - `src/app/` screens (Expo Router): `index` (grid), `day/[n]`, `goals/`, `settings`.
-- `src/features/canvas/` the day page: items, gestures, toolbar, sheets, per-day storage,
+- `src/features/canvas/` the day page: items and gestures (`canvas-item.tsx`, `use-two-finger.ts`), zoom (`use-canvas-view.ts`),
+  `layout.ts` (geometry, free spot), `history.ts` (undo / redo), toolbar, text dialog, drawing, templates, per-day storage,
   `day-merge.ts` (offline merge), `klipy.ts` + `library-grid.tsx` (sticker / GIF library).
+- `src/components/` Home: `book-cover.tsx`, `page-grid.tsx` + `mini-page.tsx`, `day-grid.tsx`, `new-things-note.tsx`.
 - `src/features/goals/` goals store, `/goal` command parser, progress.
 - `src/features/settings/` colour and start date.
 - `src/features/space/` anonymous sign-in, create space / join with code, pairing screen,
@@ -79,7 +73,7 @@ REACT_NATIVE_PACKAGER_HOSTNAME=100.117.131.14 npx expo start --port 8082 --host 
 - `src/constants/strings.ts` all UI text in one place (so a German version is easy later).
 - `src/constants/theme.ts` colours (cream light, dark) and constants.
 - Local cache keys: `ourlife.day.<n>`, `ourlife.base.<n>`, `ourlife.goals`, `ourlife.goals.pending`,
-  `ourlife.settings`, `ourlife.space`.
+  `ourlife.settings`, `ourlife.space`, `ourlife.seen`, `ourlife.mine`, `ourlife.tips`.
   Photos are copied into the app's `photos/` folder on the phone, then uploaded to Supabase Storage.
 - Goal totals are computed from the goal chips on day pages, so deleting a chip updates the total.
 - Day 1 is the start date itself; dates are calendar days, so there is no timezone drift.
@@ -121,5 +115,8 @@ REACT_NATIVE_PACKAGER_HOSTNAME=100.117.131.14 npx expo start --port 8082 --host 
 
 14. (2026-10-12) Design pass: better contrast, filled-day grid, calendar anniversaries, toolbar icons, undo delete,
     photo self-heal, three skins, paste a sticker from the clipboard.
+15. (2026-10-15) Day page overhaul: photo upload fix, sharper pictures, text width, padlock; zoomable page, 9 moods.
+16. (2026-10-16) Version 2.0.0 "Our book": fixes, canvas gestures, book look, new-things note, caption / drawing / templates
+    (built, not committed yet).
 
 See `git log --oneline` for the full history.
